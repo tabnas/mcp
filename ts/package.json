@@ -1,0 +1,64 @@
+{
+  "name": "@tabnas/mcp",
+  "version": "0.1.0",
+  "main": "dist/mcp.js",
+  "type": "commonjs",
+  "types": "dist/mcp.d.ts",
+  "description": "The tabnas agent tooling: an MCP server (stdio) and the unified `tabnas` CLI, two front-ends over one core so they cannot disagree.",
+  "homepage": "https://github.com/tabnas/mcp",
+  "keywords": [
+    "tabnas",
+    "parser",
+    "mcp",
+    "model-context-protocol",
+    "cli",
+    "grammar",
+    "agent"
+  ],
+  "author": "Richard Rodger (http://richardrodger.com)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "tabnas": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc --build src && node tools/copy-data.js",
+    "watch": "tsc --build src -w",
+    "clean": "rm -rf node_modules dist package-lock.json",
+    "reset": "npm run clean && npm i && npm run build && npm test",
+    "test": "npm run build && node --enable-source-maps --test test/*.test.js",
+    "gen-data": "node tools/gen-data.js",
+    "repo-tag": "REPO_VERSION=`node -e \"console.log(require('./package').version)\"` && echo TAG: ts/v$REPO_VERSION && git commit -a -m v$REPO_VERSION && git push && git tag ts/v$REPO_VERSION && git push origin ts/v$REPO_VERSION;",
+    "repo-publish": "npm run clean && npm i && npm run repo-publish-quick",
+    "repo-publish-quick": "npm run build && npm run test && npm run repo-tag"
+  },
+  "files": [
+    "LICENSE",
+    "dist"
+  ],
+  "exports": {
+    ".": "./dist/mcp.js",
+    "./core": "./dist/core.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ajv": "^8.20.0"
+  },
+  "peerDependencies": {
+    "@tabnas/parser": ">=0",
+    "@tabnas/support": ">=0"
+  },
+  "devDependencies": {
+    "@tabnas/parser": "*",
+    "@tabnas/support": "*",
+    "@types/node": "22.x",
+    "typescript": "5.x"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tabnas/mcp.git",
+    "directory": "ts"
+  }
+}
