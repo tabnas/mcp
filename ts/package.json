@@ -28,11 +28,12 @@
     "watch": "tsc --build src -w",
     "clean": "rm -rf node_modules dist package-lock.json",
     "reset": "npm run clean && npm i && npm run build && npm test",
-    "test": "npm run build && node --enable-source-maps --test test/*.test.js",
+    "test": "npm run build && node --enable-source-maps --test test/*.test.js && node ../benchmark/run.mjs --self-test",
     "gen-data": "node tools/gen-data.js",
     "repo-tag": "REPO_VERSION=`node -e \"console.log(require('./package').version)\"` && echo TAG: ts/v$REPO_VERSION && git commit -a -m v$REPO_VERSION && git push && git tag ts/v$REPO_VERSION && git push origin ts/v$REPO_VERSION;",
     "repo-publish": "npm run clean && npm i && npm run repo-publish-quick",
-    "repo-publish-quick": "npm run build && npm run test && npm run repo-tag"
+    "repo-publish-quick": "npm run build && npm run test && npm run repo-tag",
+    "benchmark": "node ../benchmark/run.mjs"
   },
   "files": [
     "LICENSE",
