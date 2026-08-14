@@ -1,0 +1,384 @@
+{
+  "generated_from": "sibling checkouts",
+  "plugins": [
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/abnf",
+      "go": "github.com/tabnas/abnf/go",
+      "description": "ABNF (RFC 5234) grammar compiler for the tabnas engine.",
+      "base": "@tabnas/bnf",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".abnf"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/abnf",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/bnf",
+      "go": "github.com/tabnas/bnf/go",
+      "description": "Shared BNF-family grammar compiler for the tabnas engine, used by abnf, ebnf and gbnf.",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".bnf"
+      ],
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/bnf",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/chess",
+      "go": "github.com/tabnas/chess/go",
+      "description": "Chess notation parsing for the tabnas engine: PGN games and SAN moves.",
+      "engine": "@tabnas/parser",
+      "grammar": "chess-grammar.jsonic",
+      "extensions": [
+        ".pgn"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/chess",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/css",
+      "go": "github.com/tabnas/css/go",
+      "description": "CSS parsing for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "css-grammar.jsonic",
+      "extensions": [
+        ".css"
+      ],
+      "mediaTypes": [
+        "text/css"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/css",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/csv",
+      "go": "github.com/tabnas/csv/go",
+      "description": "CSV (RFC 4180) parsing for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "csv-grammar.jsonic",
+      "extensions": [
+        ".csv"
+      ],
+      "mediaTypes": [
+        "text/csv"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [
+        "csv_extra_field",
+        "csv_missing_field"
+      ],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/csv",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/directive",
+      "go": "github.com/tabnas/directive/go",
+      "description": "Directive syntax for the tabnas engine.",
+      "engine": "@tabnas/parser",
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/directive",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/ebnf",
+      "go": "github.com/tabnas/ebnf/go",
+      "description": "EBNF grammar compiler for the tabnas engine (W3C dialect, best effort).",
+      "base": "@tabnas/bnf",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".ebnf"
+      ],
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/ebnf",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/expr",
+      "go": "github.com/tabnas/expr/go",
+      "description": "Expression syntax with operators and precedence for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/expr",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/gbnf",
+      "go": "github.com/tabnas/gbnf/go",
+      "description": "llama.cpp GBNF grammar compiler for the tabnas engine.",
+      "base": "@tabnas/bnf",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".gbnf"
+      ],
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/gbnf",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/hoover",
+      "go": "github.com/tabnas/hoover/go",
+      "description": "Whitespace-absorbing text capture for the tabnas engine.",
+      "engine": "@tabnas/parser",
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/hoover",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/json5",
+      "go": "github.com/tabnas/json5/go",
+      "description": "JSON5 parsing for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "json5-grammar.jsonic",
+      "extensions": [
+        ".json5"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [
+        "json5_empty",
+        "json5_no_value"
+      ],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/json5",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/jsonc",
+      "go": "github.com/tabnas/jsonc/go",
+      "description": "JSONC (JSON with comments) parsing for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "jsonc-grammar.jsonic",
+      "extensions": [
+        ".jsonc"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/jsonc",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/jsonic",
+      "go": "github.com/tabnas/jsonic/go",
+      "description": "The jsonic base grammar: relaxed, extensible JSON for the tabnas engine.",
+      "base": "@tabnas/json",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".jsonic"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/jsonic",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/jsonl",
+      "go": "github.com/tabnas/jsonl/go",
+      "description": "JSON Lines parsing for the tabnas engine.",
+      "base": "@tabnas/json",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".jsonl"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/jsonl",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/markdown",
+      "go": "github.com/tabnas/markdown/go",
+      "description": "CommonMark and GFM Markdown parsing for the tabnas engine.",
+      "engine": "@tabnas/parser",
+      "grammar": "markdown-grammar.jsonic",
+      "extensions": [
+        ".md",
+        ".markdown"
+      ],
+      "mediaTypes": [
+        "text/markdown"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/markdown",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/path",
+      "go": "github.com/tabnas/path/go",
+      "description": "Value-path resolution for the tabnas engine.",
+      "engine": "@tabnas/parser",
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/path",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/proto",
+      "go": "github.com/tabnas/proto/go",
+      "description": "Protocol Buffers IDL parsing for the tabnas engine (proto2, proto3, editions).",
+      "base": "@tabnas/abnf",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".proto"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/proto",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/toml",
+      "go": "github.com/tabnas/toml/go",
+      "description": "TOML parsing for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "toml-grammar.jsonic",
+      "extensions": [
+        ".toml"
+      ],
+      "mediaTypes": [
+        "application/toml"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/toml",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/xml",
+      "go": "github.com/tabnas/xml/go",
+      "description": "XML 1.0 parsing for the tabnas engine, with namespaces and entities.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "xml-grammar.jsonic",
+      "extensions": [
+        ".xml"
+      ],
+      "mediaTypes": [
+        "application/xml",
+        "text/xml"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [
+        "xml_mismatched_tag",
+        "xml_invalid_tag",
+        "unterminated_comment",
+        "unterminated_cdata",
+        "unterminated_pi",
+        "unterminated_doctype",
+        "comment_double_dash",
+        "cdata_terminator_in_text",
+        "pi_target_invalid",
+        "lt_in_attr_value",
+        "bad_entity_ref",
+        "duplicate_attribute",
+        "invalid_xml_char",
+        "reserved_namespace",
+        "unbound_prefix",
+        "invalid_namespace_uri",
+        "undeclared_entity",
+        "unparsed_entity_ref",
+        "external_entity_in_attr",
+        "text_at_top_level"
+      ],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/xml",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/yaml",
+      "go": "github.com/tabnas/yaml/go",
+      "description": "YAML parsing for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "yaml-grammar.jsonic",
+      "extensions": [
+        ".yaml",
+        ".yml"
+      ],
+      "mediaTypes": [
+        "application/yaml"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/yaml",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/zon",
+      "go": "github.com/tabnas/zon/go",
+      "description": "Zig Object Notation (ZON) parsing for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "zon-grammar.jsonic",
+      "extensions": [
+        ".zon"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [
+        "zon_number",
+        "zon_ident",
+        "zon_char",
+        "zon_doc_comment",
+        "zon_dup_field"
+      ],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/zon",
+      "versionSource": "ts/package.json"
+    }
+  ]
+}

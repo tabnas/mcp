@@ -1,0 +1,21 @@
+# Staged CI caller — promoted by a maintainer to .github/workflows/ci.yml
+# via tabnas/admin rollout/apply-ci-folders.sh (session credentials cannot
+# write .github/workflows/*; admin DECISIONS.md ADR-8).
+#
+# ts-only: this repo is tooling over the engine, not a parity package —
+# there is no go/ tree (AGENTS.md "What this project is").
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    uses: tabnas/.github/.github/workflows/polyglot-ci.yml@main
+    with:
+      deps: "parser support"
+      build-order: "parser support mcp"
+      run-go: false
