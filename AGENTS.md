@@ -28,6 +28,7 @@ structural grammar validation is runtime behaviour of
 | `ts/tools/copy-data.js` | Build step: copies `data/` into `ts/dist/data/` so the bundle actually ships (npm files are `LICENSE` + `dist` only). |
 | `data/` | **Bundled, generated, committed** copies of the fleet contract files: `grammar.schema.json`, `diagnostic.schema.json`, `error-codes.json`, `DIVERGENCE.md`, `plugins.json`. Never edit by hand. |
 | `ts/test/` | `node --test` suites, CJS. `golden.test.js` is the front-end parity gate. |
+| `benchmark/` | The AX benchmark (plan E1): ten agent tasks, their starting state, and a machine check per task. `--self-test` runs as part of `npm test` and measures **the benchmark**, not any agent. See [`benchmark/README.md`](benchmark/README.md). |
 | `ci/ci.yml` | The staged CI workflow (see "CI"). |
 
 ## Authority and alignment rules
@@ -151,6 +152,11 @@ What "correct" means here, in order of authority:
    or options — and the pollution test proves `({}).polluted` stays
    `undefined` after a rejected poison grammar.
 4. **CLI exit codes hold**: 0 success, 1 operation-said-no, 2 usage.
+5. **The benchmark self-test passes**: every one of its ten tasks is still
+   solvable, and every check still rejects a deliberately wrong answer. It
+   runs against the built CLI, so it fails when a flag is renamed or an
+   output shape changes — which is exactly what it is for. It says nothing
+   about any agent, and a green run must never be reported as one.
 
 ## CI
 

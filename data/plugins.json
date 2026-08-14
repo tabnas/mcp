@@ -33,6 +33,24 @@
     },
     {
       "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/c",
+      "go": "github.com/tabnas/c/go",
+      "description": "C source parsing for the tabnas engine (C23 plus common compiler extensions), preserving macros.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "ts/c-grammar.jsonic",
+      "extensions": [
+        ".c",
+        ".h"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/c",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
       "name": "@tabnas/chess",
       "go": "github.com/tabnas/chess/go",
       "description": "Chess notation parsing for the tabnas engine: PGN games and SAN moves.",
@@ -92,6 +110,18 @@
     },
     {
       "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/debug",
+      "go": "github.com/tabnas/debug/go",
+      "description": "Parse tracing and a structured grammar-model describe() for the tabnas engine.",
+      "engine": "@tabnas/parser",
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/debug",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
       "name": "@tabnas/directive",
       "go": "github.com/tabnas/directive/go",
       "description": "Directive syntax for the tabnas engine.",
@@ -132,6 +162,22 @@
     },
     {
       "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/feed",
+      "go": "github.com/tabnas/feed/go",
+      "description": "RSS (0.90 to 2.0) and Atom (0.3, 1.0) feed parsing for the tabnas engine, normalized to an Atom shape.",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".rss",
+        ".atom"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/feed",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
       "name": "@tabnas/gbnf",
       "go": "github.com/tabnas/gbnf/go",
       "description": "llama.cpp GBNF grammar compiler for the tabnas engine.",
@@ -155,6 +201,44 @@
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/hoover",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/ini",
+      "go": "github.com/tabnas/ini/go",
+      "description": "INI configuration-file parsing for the tabnas engine.",
+      "base": "@tabnas/jsonic",
+      "engine": "@tabnas/parser",
+      "grammar": "ini-grammar.jsonic",
+      "extensions": [
+        ".ini"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [
+        "duplicate_section",
+        "unterminated_section"
+      ],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/ini",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/json",
+      "go": "github.com/tabnas/json/go",
+      "description": "A standard JSON parser (RFC 8259) for the tabnas engine.",
+      "engine": "@tabnas/parser",
+      "extensions": [
+        ".json"
+      ],
+      "mediaTypes": [
+        "application/json"
+      ],
+      "specDir": "test/spec",
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/json",
       "versionSource": "ts/package.json"
     },
     {
@@ -244,6 +328,21 @@
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/markdown",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/multisource",
+      "go": "github.com/tabnas/multisource/go",
+      "description": "Multi-source document assembly for the tabnas engine: resolves and merges included sources.",
+      "engine": "@tabnas/parser",
+      "specDir": "test/spec",
+      "errorCodes": [
+        "multisource_not_found",
+        "multisource_cycle"
+      ],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/multisource",
       "versionSource": "ts/package.json"
     },
     {
