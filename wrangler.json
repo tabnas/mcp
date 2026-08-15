@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tabnas-mcp",
+  "main": "ts/dist/worker.js",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "placement": { "mode": "smart" },
+  "limits": { "cpu_ms": 200 },
+  "routes": [{ "pattern": "mcp.tabnas.dev", "custom_domain": true }]
+}
