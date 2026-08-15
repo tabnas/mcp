@@ -29,6 +29,8 @@ structural grammar validation is runtime behaviour of
 | `data/` | **Bundled, generated, committed** copies of the fleet contract files: `grammar.schema.json`, `diagnostic.schema.json`, `error-codes.json`, `DIVERGENCE.md`, `plugins.json`. Never edit by hand. |
 | `ts/test/` | `node --test` suites, CJS. `golden.test.js` is the front-end parity gate. |
 | `benchmark/` | The AX benchmark (plan E1): ten agent tasks, their starting state, and a machine check per task. `--self-test` runs as part of `npm test` and measures **the benchmark**, not any agent. See [`benchmark/README.md`](benchmark/README.md). |
+| `ts/src/worker.ts` | The **hosted** endpoint (plan Phase 4): streamable-HTTP MCP at `POST /mcp`, plus `/health` and `/.well-known/mcp`. Transport, budget and shape-only telemetry ONLY — every parsing decision is the same core, so hosted and local cannot diverge. |
+| `wrangler.json` | The hosted Worker's deploy config (`mcp.tabnas.dev`). Separate from the website's Worker on purpose. |
 | `ci/ci.yml` | The staged CI workflow (see "CI"). |
 
 ## Authority and alignment rules
@@ -157,6 +159,42 @@ What "correct" means here, in order of authority:
    runs against the built CLI, so it fails when a flag is renamed or an
    output shape changes — which is exactly what it is for. It says nothing
    about any agent, and a green run must never be reported as one.
+
+## The hosted endpoint (Phase 4)
+
+`ts/src/worker.ts` serves the same six tools over streamable HTTP at
+`mcp.tabnas.dev`, for agents that cannot run `npx`. **Local stdio stays the
+recommended path** — free, private, reproducible — and the hosted service
+exists for convenience, not as a general remote parser API.
+
+It is deliberately thin: transport, request validation, budget enforcement
+and telemetry. Every parsing decision is the shared core, so hosted and local
+answer identically; `test/worker.test.js` pins that by comparing a hosted
+`tools/call` result byte-for-byte against `callTool()`.
+
+Four rules this file must keep:
+
+1. **Never route around the firewall.** A `GrammarSpec` may carry `ref`
+   function references, and accepting one turns "validate this grammar" into
+   "execute supplied code". The core refuses them; the worker tests pin that
+   refusal **over HTTP**, because that is the surface an attacker reaches.
+   There is no shell, no filesystem, no outbound network, and no way to add
+   one that is worth having.
+2. **Limits are correctness, not tuning.** A 256 KB body cap sits in front of
+   the core's own `MAX_GRAMMAR_RULES` and `MAX_TEST_ROWS`. A breach answers
+   with `code: "limit_exceeded"`, naming the limit, the ceiling and the local
+   alternative — an agent has to be able to correct rather than guess.
+3. **Telemetry records shape, never content.** Tool name, size *bucket*,
+   duration, status, error code. Not a byte count (an exact size is a weak
+   fingerprint of a document) and never any of the document. The test
+   asserts a parsed secret does not appear in the emitted record.
+4. **Stateless.** No sessions, no Durable Objects, no store. Every call is
+   self-contained, which is what makes the service cheap, horizontally
+   trivial, and honest about privacy.
+
+Deploying is a maintainer action — an agent session has no Cloudflare
+credentials. `npm run worker-dev` runs it locally; `npm run worker-deploy`
+is the deploy, and the custom domain in `wrangler.json` has to exist first.
 
 ## CI
 
