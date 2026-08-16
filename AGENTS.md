@@ -20,8 +20,9 @@ structural grammar validation is runtime behaviour of
 
 | Path | What it is |
 |---|---|
-| `ts/src/core.ts` | The six operations. **The ONLY place operation logic lives.** |
-| `ts/src/mcp.ts` | MCP front-end: six tools + five resources over stdio. Package main; importing it must never touch stdio (the transport starts only under `require.main`). Exports `main()` — the CLI's `mcp` subcommand starts the identical server through it. |
+| `ts/src/core.ts` | The six data operations. **The ONLY place operation logic lives.** |
+| `ts/src/compat.ts` | The seventh operation, grammar compatibility (plan Phase 5). Its own module because it is the only one that loads TWO grammars and runs them against each other; it reuses core's firewall, bounds and instance builder rather than a copy. |
+| `ts/src/mcp.ts` | MCP front-end: seven tools + five resources over stdio. Package main; importing it must never touch stdio (the transport starts only under `require.main`). Exports `main()` — the CLI's `mcp` subcommand starts the identical server through it. |
 | `ts/src/cli.ts` | The `tabnas` CLI front-end: argument plumbing, human rendering, exit codes. The `mcp` subcommand lazily requires `mcp.ts` and runs the stdio server (so the data-command fast paths never load the MCP SDK). |
 | `ts/src/data.ts` | Loader for the bundled data (reads `ts/dist/data/`, the build-time copy of `data/`). |
 | `ts/tools/gen-data.js` | Regenerates `data/` from sibling checkouts (`../<repo>`). `npm run gen-data`. |
@@ -162,7 +163,7 @@ What "correct" means here, in order of authority:
 
 ## The hosted endpoint (Phase 4)
 
-`ts/src/worker.ts` serves the same six tools over streamable HTTP at
+`ts/src/worker.ts` serves the same seven tools over streamable HTTP at
 `mcp.tabnas.dev`, for agents that cannot run `npx`. **Local stdio stays the
 recommended path** — free, private, reproducible — and the hosted service
 exists for convenience, not as a general remote parser API.

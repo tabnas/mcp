@@ -27,6 +27,8 @@
 // regardless, and it is free, private and reproducible.
 
 import { callTool, TOOLS, RESOURCES } from './mcp'
+
+import { MAX_CORPUS, MAX_GENERATED } from './compat'
 import { packageInfo, rawData } from './data'
 
 // --- budget -----------------------------------------------------------------
@@ -218,7 +220,15 @@ export async function handle(request: Request): Promise<Response> {
       endpoint: '/mcp',
       tools: TOOLS.map((t) => t.name),
       resources: RESOURCES.map((r) => r.uri),
-      limits: { body_bytes: MAX_BODY_BYTES },
+      // Every bound the caller can hit, stated up front. compare_grammars
+      // is the most expensive tool here — it parses each corpus row and each
+      // generated derivation twice, once per grammar — so its caps belong
+      // beside the body cap rather than being discovered by hitting them.
+      limits: {
+        body_bytes: MAX_BODY_BYTES,
+        compare_corpus_rows: MAX_CORPUS,
+        compare_generated_inputs: MAX_GENERATED,
+      },
       privacy: 'Document content is never logged, stored, or used for training.',
       local: 'npx --yes @tabnas/mcp mcp',
     })

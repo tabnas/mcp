@@ -20,7 +20,9 @@
  * No network access, ever. Input files may be '-' for stdin.
  */
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
+
+import { loadSpec, loadSpecDir } from '@tabnas/support'
 
 import {
   parseDetailed,
@@ -33,6 +35,8 @@ import {
   Invalid,
   TestRow,
 } from './core'
+
+import { compareGrammars, CompareReport } from './compat'
 
 import { packageInfo } from './data'
 
@@ -51,11 +55,18 @@ commands:
   test     --spec fixtures.tsv [--grammar g.json] [--json]
                                                   run TSV fixtures
   plugins  [name] [--json]                        list plugins / one descriptor
+  compare  --a old.json --b new.json [--corpus dir|file] [--depth n] [--json]
+                                                  grammar compatibility report
   mcp                                             run the MCP server (stdio)
 
 options:
   --grammar <path>  serialized GrammarSpec JSON file
   --spec <path>     TSV fixture file (tabnas convention: line 1 is a header)
+  --a <path>        baseline grammar, for compare (the deployed one)
+  --b <path>        candidate grammar, for compare
+  --corpus <path>   .tsv fixture file or a directory of them, replayed
+                    through both grammars by compare
+  --depth <n>       compare: derivation depth for generated inputs (0..5)
   --json            print the raw operation result JSON (the same bytes the
                     MCP tool returns)
   --help, -h        this help
@@ -65,7 +76,8 @@ input is read from <file>, or from stdin when the argument is '-' or absent.
 
 exit codes:
   0  success: parse succeeded / grammar valid / all fixture rows passed
-  1  parse failure, invalid grammar, fixture failures, unknown plugin
+  1  parse failure, invalid grammar, fixture failures, unknown plugin,
+     or a compare that found any change between the two grammars
   2  usage error: unknown flags, missing or unreadable files
 `
 
@@ -77,6 +89,10 @@ type Flags = {
   json: boolean
   grammarPath?: string
   specPath?: string
+  aPath?: string
+  bPath?: string
+  corpusPath?: string
+  depth?: number
   positional: string[]
 }
 
@@ -96,6 +112,30 @@ function parseFlags(argv: string[]): Flags {
         throw new UsageError('--spec requires a file path')
       }
       flags.specPath = argv[i]
+    } else if ('--a' === arg) {
+      if (undefined === argv[++i]) {
+        throw new UsageError('--a requires a file path')
+      }
+      flags.aPath = argv[i]
+    } else if ('--b' === arg) {
+      if (undefined === argv[++i]) {
+        throw new UsageError('--b requires a file path')
+      }
+      flags.bPath = argv[i]
+    } else if ('--corpus' === arg) {
+      if (undefined === argv[++i]) {
+        throw new UsageError('--corpus requires a file or directory path')
+      }
+      flags.corpusPath = argv[i]
+    } else if ('--depth' === arg) {
+      if (undefined === argv[++i]) {
+        throw new UsageError('--depth requires an integer')
+      }
+      const n = Number(argv[i])
+      if (!Number.isInteger(n)) {
+        throw new UsageError('--depth requires an integer')
+      }
+      flags.depth = n
     } else if ('-' === arg || !arg.startsWith('-')) {
       flags.positional.push(arg)
     } else {
@@ -305,6 +345,120 @@ function cmdPlugins(flags: Flags): number {
   return 0
 }
 
+
+// Load the corpus for `compare`. A .tsv file or a directory of them, read
+// through @tabnas/support so corpus handling has ONE implementation — the
+// same loader the fixture runners use, with the same header and escape
+// conventions. The fleet's 5,180 fixture rows are the corpus this phase was
+// designed around, and they are already curated as meaningful inputs.
+//
+// The INPUT column only: an expectation column says what the old grammar did,
+// and compare asks what the new one does, which is a different question.
+function readCorpus(path: string): string[] {
+  let files
+  try {
+    files = statSync(path).isDirectory() ? loadSpecDir(path) : [loadSpec(path)]
+  } catch (err) {
+    throw new UsageError(`cannot read corpus ${path}: ` + msg(err))
+  }
+  const out: string[] = []
+  for (const file of files) {
+    for (const row of file.rows) {
+      const input = row.unesc(0)
+      if ('' !== input) {
+        out.push(input)
+      }
+    }
+  }
+  return out
+}
+
+function cmdCompare(flags: Flags): number {
+  if (0 < flags.positional.length) {
+    throw new UsageError('compare takes no positional arguments')
+  }
+  if (undefined === flags.aPath || undefined === flags.bPath) {
+    throw new UsageError('compare requires --a <path> and --b <path>')
+  }
+  const req = {
+    a: readGrammar(flags.aPath),
+    b: readGrammar(flags.bPath),
+    ...(undefined !== flags.corpusPath
+      ? { corpus: readCorpus(flags.corpusPath) } : {}),
+    ...(undefined !== flags.depth ? { depth: flags.depth } : {}),
+  }
+  const result = compareGrammars(req)
+  if (flags.json) {
+    out(stringifyResult(result))
+    return isInvalid(result) || 0 < result.changes.length ? 1 : 0
+  }
+  if (isInvalid(result)) {
+    renderInvalid(result)
+    return 1
+  }
+  renderCompare(result)
+  return 0 < result.changes.length ? 1 : 0
+}
+
+// The human rendering leads with confidence and its reason, because a reader
+// who stops after one line should take away how much the report can be
+// trusted — not a verdict it deliberately does not give.
+function renderCompare(r: CompareReport): void {
+  out(`confidence: ${r.confidence}`)
+  out(`  ${r.why}`)
+  out('')
+
+  if (r.normalForm.identical) {
+    out('normal form: identical')
+  } else {
+    out('normal form: differs')
+  }
+
+  out('')
+  out('proven:')
+  for (const p of r.proven) {
+    out(`  [${p.status}] ${p.claim}`)
+    out(`      ${p.basis}`)
+    if (undefined !== p.detail) {
+      out(`      ${p.detail}`)
+    }
+  }
+
+  out('')
+  out('observed:')
+  for (const o of r.observed) {
+    out(`  ${o.tier}: ran ${o.ran}, both accept ${o.bothAccept}, ` +
+      `both reject ${o.bothReject}`)
+    if (undefined !== o.note) {
+      out(`      ${o.note}`)
+    }
+  }
+
+  if (0 < r.changes.length) {
+    out('')
+    out(`changes (${r.changes.length}):`)
+    for (const c of r.changes.slice(0, 20)) {
+      out(`  ${c.kind}: ${c.detail}` +
+        (undefined === c.input ? '' : `  input=${JSON.stringify(c.input)}`))
+    }
+    if (20 < r.changes.length) {
+      out(`  ... and ${r.changes.length - 20} more`)
+    }
+  }
+
+  if (0 < r.counterexamples.length) {
+    out('')
+    out(`counterexamples (${r.counterexamples.length}):`)
+    for (const c of r.counterexamples.slice(0, 10)) {
+      out(`  ${JSON.stringify(c.input)}`)
+      out(`      ${c.why}`)
+    }
+    if (10 < r.counterexamples.length) {
+      out(`  ... and ${r.counterexamples.length - 10} more`)
+    }
+  }
+}
+
 function cmdMcp(flags: Flags): number {
   if (0 < flags.positional.length) {
     throw new UsageError('mcp takes no arguments')
@@ -357,6 +511,8 @@ export function run(argv: string[]): number {
       return cmdTest(flags)
     case 'plugins':
       return cmdPlugins(flags)
+    case 'compare':
+      return cmdCompare(flags)
     case 'mcp':
       return cmdMcp(flags)
     default:
