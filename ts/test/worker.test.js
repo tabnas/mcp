@@ -47,10 +47,14 @@ describe('hosted worker: discovery', () => {
     assert.strictEqual(body.transport, 'streamable-http')
     assert.strictEqual(body.endpoint, '/mcp')
     assert.deepStrictEqual(body.tools.sort(), [
-      'describe_plugin', 'explain_parse_error', 'list_plugins',
-      'parse', 'test_grammar', 'validate_grammar',
+      'compare_grammars', 'describe_plugin', 'explain_parse_error',
+      'list_plugins', 'parse', 'test_grammar', 'validate_grammar',
     ])
     assert.strictEqual(body.limits.body_bytes, MAX_BODY_BYTES)
+    // compare_grammars is the most expensive tool hosted here, so its caps
+    // are served alongside the body cap rather than found by hitting them.
+    assert.ok(0 < body.limits.compare_corpus_rows)
+    assert.ok(0 < body.limits.compare_generated_inputs)
     // The promise is load-bearing: it is what makes the local/hosted split
     // honest, so it is served, not just written on a web page.
     assert.match(body.privacy, /never logged/)
@@ -64,12 +68,12 @@ describe('hosted worker: discovery', () => {
 })
 
 describe('hosted worker: protocol', () => {
-  it('initializes and lists the six tools', async () => {
+  it('initializes and lists the seven tools', async () => {
     const init = await (await rpc('initialize')).json()
     assert.strictEqual(init.result.serverInfo.name, 'tabnas')
 
     const list = await (await rpc('tools/list')).json()
-    assert.strictEqual(list.result.tools.length, 6)
+    assert.strictEqual(list.result.tools.length, 7)
   })
 
   it('serves the contract files as resources', async () => {

@@ -33,6 +33,8 @@ import {
   MAX_TEST_ROWS,
 } from './core'
 
+import { compareGrammars } from './compat'
+
 import { packageInfo, rawData } from './data'
 
 
@@ -183,6 +185,52 @@ export const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'compare_grammars',
+    description: 'Grammar compatibility (AX plan Phase 5): does candidate ' +
+      'grammar B still accept what baseline A accepted, and does it build ' +
+      'the same tree for inputs both accept? Returns EVIDENCE AND ' +
+      'CONFIDENCE, never a bare verdict: {normalForm, proven[], ' +
+      'observed[], changes[], counterexamples[], confidence, why}. ' +
+      "confidence:'low' with a stated reason is a successful run, not a " +
+      'failure — language inclusion is undecidable in general, so anything ' +
+      'outside the decidable subset is reported not-proven rather than ' +
+      'incompatible. Supply `corpus` (real inputs) for the tier that ' +
+      'measures what your documents actually do.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        a: {
+          type: 'object',
+          description: 'Baseline grammar: the serialized GrammarSpec ' +
+            'already deployed.',
+        },
+        b: {
+          type: 'object',
+          description: 'Candidate grammar: the serialized GrammarSpec ' +
+            'proposed to replace it.',
+        },
+        corpus: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Inputs to replay through both grammars, comparing ' +
+            'acceptance and tree shape.',
+        },
+        options: {
+          type: 'object',
+          description: 'TabnasOptions applied to both instances.',
+        },
+        depth: {
+          type: 'integer',
+          minimum: 0,
+          maximum: 5,
+          description: 'Derivation depth for generated inputs (default 3).',
+        },
+      },
+      required: ['a', 'b'],
+      additionalProperties: false,
+    },
+  },
 ] as const
 
 // Resource definitions: the bundled data/ files, served verbatim.
@@ -249,6 +297,8 @@ export function callTool(name: string, args: unknown): string {
       return stringifyResult(listPlugins())
     case 'describe_plugin':
       return stringifyResult(describePlugin(req))
+    case 'compare_grammars':
+      return stringifyResult(compareGrammars(req))
     default:
       throw new Error(`unknown tool: ${name}`)
   }

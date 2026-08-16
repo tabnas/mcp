@@ -36,7 +36,7 @@ cache miss `npx` would otherwise prompt on the stdin the MCP transport
 owns. Pin an exact version so the tools cannot drift under an installed
 client.)
 
-## The six tools
+## The seven tools
 
 | Tool | Answers | Result |
 | --- | --- | --- |
@@ -46,6 +46,7 @@ client.)
 | `test_grammar` | do these TSV fixtures pass? | `{pass, fail, rows:[{row,input,expected,got,ok}]}` |
 | `list_plugins` | what grammar plugins exist? | `{plugins:[...]}` |
 | `describe_plugin` | one plugin's full descriptor | the `tabnas.plugin.json` object |
+| `compare_grammars` | does a grammar change still accept what the old one accepted, and build the same trees? | `{normalForm, proven[], observed[], changes[], counterexamples[], confidence, why}` |
 
 Notes on the contracts:
 
@@ -98,6 +99,7 @@ tabnas validate --grammar g.json [--json]
 tabnas diagnose [file|-] [--grammar g.json] [--json]
 tabnas test     --spec fixtures.tsv [--grammar g.json] [--json]
 tabnas plugins  [name] [--json]
+tabnas compare  --a old.json --b new.json [--corpus dir|file] [--depth n] [--json]
 tabnas mcp                                        # run the MCP server (stdio)
 ```
 
@@ -119,6 +121,47 @@ Exit codes:
 | 0 | success: parse succeeded / grammar valid / all fixture rows passed |
 | 1 | the operation said no: parse failure, invalid grammar, fixture failures, unknown plugin |
 | 2 | usage error: unknown flags or command, missing/unreadable files, malformed grammar JSON |
+
+## Grammar compatibility (`compare`)
+
+Two questions, reported separately, because they fail differently:
+
+1. **Acceptance** — does the candidate still accept what the baseline
+   accepted?
+2. **Output** — for inputs both accept, is the resulting tree the same?
+
+The second is the one users feel. A change that still accepts every
+historical document but reshapes the tree silently breaks every downstream
+consumer, and an acceptance-only test reports success.
+
+**The report carries evidence and confidence, never a bare verdict.** There
+is deliberately no `compatible: true` field. Language inclusion is
+undecidable in general, so a tool that printed one would eventually be wrong
+in production:
+
+- `proven[]` — what was established statically, and on what basis. Anything
+  outside the decidable subset is `not-proven`, which is a statement about
+  this tool, **not** a claim that the grammars are incompatible.
+- `observed[]` — what actually ran, and how much of it.
+- `changes[]` / `counterexamples[]` — concrete differences, with inputs.
+- `confidence` + `why` — how much weight the *absence* of findings can bear.
+  `confidence: "low"` with a stated reason is a **successful** run.
+
+The check that earns its keep is alternate **ordering**. Alternates are
+first-match-wins, so one inserted earlier can shadow a later one and narrow
+the accepted language while a set comparison calls it an addition. `compare`
+walks positions, not membership, and reports a shadowed alternate that used
+to be reachable.
+
+`--corpus` takes a `.tsv` fixture file or a directory of them, loaded through
+`@tabnas/support` — the same loader the fixture runners use. Real inputs are
+the only tier that measures what your documents actually do:
+
+```bash
+tabnas compare --a v1.json --b v2.json --corpus ../json/test/spec
+```
+
+Exit code is 1 when any change is found, so it works as a release gate.
 
 ## Bundled data
 

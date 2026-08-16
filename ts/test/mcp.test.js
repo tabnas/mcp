@@ -38,6 +38,7 @@ const TOOL_NAMES = [
   'test_grammar',
   'list_plugins',
   'describe_plugin',
+  'compare_grammars',
 ]
 
 const RESOURCE_FILES = {
@@ -64,14 +65,14 @@ describe('mcp server (in-process)', () => {
     }
   })
 
-  it('serves exactly the six tools, with object input schemas', async () => {
+  it('serves exactly the seven tools, with object input schemas', async () => {
     const { tools } = await client.listTools()
     assert.deepStrictEqual(tools.map((t) => t.name), TOOL_NAMES)
     for (const tool of tools) {
       assert.strictEqual(tool.inputSchema.type, 'object', tool.name)
       assert.ok(tool.description, tool.name + ' needs a description')
     }
-    // The exported definition list is the same six, same order.
+    // The exported definition list is the same seven, same order.
     assert.deepStrictEqual(TOOLS.map((t) => t.name), TOOL_NAMES)
   })
 

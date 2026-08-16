@@ -399,7 +399,7 @@ function structuralIssues(gs: Record<string, unknown>): ValidationIssue[] {
 // security scan and the structural walk both pass: those two decide the
 // grammar is DATA, and only then is it worth (and safe to reason about)
 // handing to the engine.
-function validateGrammarInternal(grammar: unknown): {
+export function validateGrammarInternal(grammar: unknown): {
   errors: ValidationIssue[]
   v: number
 } {
@@ -471,7 +471,7 @@ function validateGrammarInternal(grammar: unknown): {
 // ---------------------------------------------------------------------
 // Request plumbing shared by the operations.
 
-function invalid(path: string, message: string): Invalid {
+export function invalid(path: string, message: string): Invalid {
   return { ok: false, errors: [{ path, message }] }
 }
 
@@ -483,6 +483,8 @@ function nonDiagnosticError(err: unknown): Invalid {
   return invalid('', err instanceof Error ? err.message : String(err))
 }
 
+// Exported as checkOptionsPublic below for compat.ts, which must apply the
+// SAME options firewall as every other operation rather than a copy of it.
 function checkOptions(options: unknown): Invalid | null {
   if (undefined === options) {
     return null
@@ -513,7 +515,7 @@ function checkOptions(options: unknown): Invalid | null {
 // Invalid result explaining why not. The grammar has been validated by
 // the time this runs, so a failure here is an options/grammar interplay
 // the validation instance could not see.
-function buildInstance(
+export function buildInstance(
   options: Record<string, unknown> | undefined,
   grammar: Record<string, unknown> | undefined,
 ): Tabnas | Invalid {
@@ -535,7 +537,7 @@ function buildInstance(
   return tn
 }
 
-function isInvalid(v: unknown): v is Invalid {
+export function isInvalid(v: unknown): v is Invalid {
   return null != v && 'object' === typeof v &&
     false === (v as Invalid).ok && Array.isArray((v as Invalid).errors)
 }
@@ -833,3 +835,8 @@ export function describePlugin(req: DescribePluginRequest): DescribePluginResult
   }
   return hit
 }
+
+
+// The options firewall, for compat.ts. Same function, exported under a
+// name that says it crosses a module boundary on purpose.
+export const checkOptionsPublic = checkOptions
