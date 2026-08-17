@@ -459,7 +459,6 @@
       "go": "github.com/tabnas/markdown/go",
       "description": "CommonMark and GFM Markdown parsing for the tabnas engine.",
       "engine": "@tabnas/parser",
-      "grammar": "markdown-grammar.jsonic",
       "extensions": [
         ".md",
         ".markdown"
