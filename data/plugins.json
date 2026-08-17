@@ -12,6 +12,17 @@
         ".abnf"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasabnf",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/abnf",
@@ -44,6 +55,17 @@
         ".h"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasc",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/c",
@@ -60,6 +82,17 @@
         ".pgn"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnaschess",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/chess",
@@ -80,6 +113,17 @@
         "text/css"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnascss",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/css",
@@ -100,6 +144,17 @@
         "text/csv"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnascsv",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [
         "csv_extra_field",
         "csv_missing_field"
@@ -142,6 +197,17 @@
       "extensions": [
         ".ebnf"
       ],
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasebnf",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/ebnf",
@@ -171,6 +237,17 @@
         ".atom"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasfeed",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/feed",
@@ -215,6 +292,17 @@
         ".ini"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasini",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [
         "duplicate_section",
         "unterminated_section"
@@ -236,6 +324,17 @@
         "application/json"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasjson",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/json",
@@ -253,6 +352,17 @@
         ".json5"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasjson5",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [
         "json5_empty",
         "json5_no_value"
@@ -273,6 +383,17 @@
         ".jsonc"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasjsonc",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/jsonc",
@@ -289,6 +410,17 @@
         ".jsonic"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasjsonic",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/jsonic",
@@ -305,6 +437,17 @@
         ".jsonl"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasjsonl",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/jsonl",
@@ -325,6 +468,17 @@
         "text/markdown"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasmarkdown",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/markdown",
@@ -368,6 +522,17 @@
         ".proto"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasproto",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/proto",
@@ -388,6 +553,17 @@
         "application/toml"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnastoml",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/toml",
@@ -409,6 +585,17 @@
         "text/xml"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasxml",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [
         "xml_mismatched_tag",
         "xml_invalid_tag",
@@ -451,6 +638,17 @@
         "application/yaml"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasyaml",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/yaml",
@@ -468,6 +666,17 @@
         ".zon"
       ],
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnaszon",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [
         "zon_number",
         "zon_ident",
