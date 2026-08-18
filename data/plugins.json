@@ -143,6 +143,14 @@
       "mediaTypes": [
         "text/csv"
       ],
+      "languageId": "csv",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma"
+      ],
       "specDir": "test/spec",
       "clib": {
         "dir": "go/clib",
@@ -291,6 +299,15 @@
       "extensions": [
         ".ini"
       ],
+      "languageId": "ini",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close"
+      ],
       "specDir": "test/spec",
       "clib": {
         "dir": "go/clib",
@@ -323,6 +340,15 @@
       "mediaTypes": [
         "application/json"
       ],
+      "languageId": "json",
+      "pluginKind": "grammar",
+      "grammarKind": "data",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close"
+      ],
       "specDir": "test/spec",
       "clib": {
         "dir": "go/clib",
@@ -350,6 +376,16 @@
       "grammar": "json5-grammar.jsonic",
       "extensions": [
         ".json5"
+      ],
+      "languageId": "json5",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close",
+        "sync"
       ],
       "specDir": "test/spec",
       "clib": {
@@ -382,6 +418,15 @@
       "extensions": [
         ".jsonc"
       ],
+      "languageId": "jsonc",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close"
+      ],
       "specDir": "test/spec",
       "clib": {
         "dir": "go/clib",
@@ -409,6 +454,16 @@
       "extensions": [
         ".jsonic"
       ],
+      "languageId": "jsonic",
+      "pluginKind": "grammar",
+      "grammarKind": "imperative",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close",
+        "sync"
+      ],
       "specDir": "test/spec",
       "clib": {
         "dir": "go/clib",
@@ -435,6 +490,15 @@
       "engine": "@tabnas/parser",
       "extensions": [
         ".jsonl"
+      ],
+      "languageId": "jsonl",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close"
       ],
       "specDir": "test/spec",
       "clib": {
@@ -551,6 +615,15 @@
       "mediaTypes": [
         "application/toml"
       ],
+      "languageId": "toml",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close"
+      ],
       "specDir": "test/spec",
       "clib": {
         "dir": "go/clib",
@@ -582,6 +655,15 @@
       "mediaTypes": [
         "application/xml",
         "text/xml"
+      ],
+      "languageId": "xml",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close"
       ],
       "specDir": "test/spec",
       "clib": {
@@ -636,6 +718,16 @@
       "mediaTypes": [
         "application/yaml"
       ],
+      "languageId": "yaml",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close",
+        "sync"
+      ],
       "specDir": "test/spec",
       "clib": {
         "dir": "go/clib",
@@ -663,6 +755,15 @@
       "grammar": "zon-grammar.jsonic",
       "extensions": [
         ".zon"
+      ],
+      "languageId": "zon",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end",
+        "comma",
+        "close"
       ],
       "specDir": "test/spec",
       "clib": {
