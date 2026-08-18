@@ -23,7 +23,7 @@ MCP client configuration (stdio):
   "mcpServers": {
     "tabnas": {
       "command": "npx",
-      "args": ["--yes", "@tabnas/mcp@0.1.0", "mcp"]
+      "args": ["--yes", "@tabnas/mcp@0.1.3", "mcp"]
     }
   }
 }
@@ -31,7 +31,7 @@ MCP client configuration (stdio):
 
 The server is started by the `mcp` subcommand of the CLI
 (`tabnas mcp`), which is exactly what the skills package's `mcp.json`
-invokes as `npx --yes @tabnas/mcp@0.1.0 mcp`. (`--yes` matters: on a
+invokes as `npx --yes @tabnas/mcp@0.1.3 mcp`. (`--yes` matters: on a
 cache miss `npx` would otherwise prompt on the stdin the MCP transport
 owns. Pin an exact version so the tools cannot drift under an installed
 client.)
