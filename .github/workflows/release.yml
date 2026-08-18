@@ -1,0 +1,46 @@
+# Staged per ADR-8: automation cannot push .github/workflows/*, so this file
+# is written to <repo>/ci/release.yml for a maintainer to promote via
+# admin/rollout/apply-ci-folders.sh.
+#
+# Publishes @tabnas/mcp to npm on a `ts/v*` tag push, via GitHub OIDC Trusted
+# Publishing (no token). The build runs against the ALREADY-PUBLISHED
+# dependency versions (npm i resolves them), so a failing build never
+# publishes. Byte-identical to the release.yml in parser, json, jsonic and
+# expr from `name:` onward.
+#
+# This repo has no go/, so there is no Go job: the Cloudflare worker is a
+# separate delivery channel (wrangler, see worker-deploy) and is NOT part of
+# the npm release.
+#
+# Tests are not re-run here — the orchestrator (admin/publish.sh) verifies
+# build+test locally against published deps and requires a green main CI
+# before tagging.
+name: release
+
+on:
+  push:
+    tags:
+      - 'ts/v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Build and publish to npm (OIDC trusted publishing)
+        working-directory: ts
+        run: |
+          npm install -g npm@latest
+          npm i
+          npm run build --if-present
+          npm publish --access public
