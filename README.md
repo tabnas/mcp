@@ -23,18 +23,25 @@ MCP client configuration (stdio):
   "mcpServers": {
     "tabnas": {
       "command": "npx",
-      "args": ["--yes", "@tabnas/mcp@0.1.3", "mcp"]
+      "args": ["--yes", "@tabnas/mcp@<x.y.z>", "mcp"]
     }
   }
 }
 ```
 
+Fill in `<x.y.z>` with the current version — `npm view @tabnas/mcp
+version`. This README does not name it: a repo cannot carry an exact pin
+of its own published version, because the commit that updates it becomes
+the next release's content, leaving it one release behind forever.
+
 The server is started by the `mcp` subcommand of the CLI
 (`tabnas mcp`), which is exactly what the skills package's `mcp.json`
-invokes as `npx --yes @tabnas/mcp@0.1.3 mcp`. (`--yes` matters: on a
+invokes as `npx --yes @tabnas/mcp@<x.y.z> mcp`. (`--yes` matters: on a
 cache miss `npx` would otherwise prompt on the stdin the MCP transport
 owns. Pin an exact version so the tools cannot drift under an installed
-client.)
+client — `skills/mcp.json` carries the real one, written from the
+registry by its `tools/sync-mcp-pin.js` and checked by
+`tools/validate.js --online`.)
 
 ## The seven tools
 

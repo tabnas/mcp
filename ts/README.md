@@ -33,7 +33,7 @@ Exit codes: `0` success, `1` the operation said no (parse failure,
 invalid grammar, fixture failures, unknown plugin), `2` usage error.
 `tabnas --help` has the details. The CLI never touches the network.
 `tabnas mcp` runs the stdio MCP server (the entry the skills package's
-`mcp.json` invokes as `npx --yes @tabnas/mcp@0.1.3 mcp`).
+`mcp.json` invokes as `npx --yes @tabnas/mcp@<x.y.z> mcp`).
 
 Serialized grammars and their options are validated before use by a
 firewall that rejects a prototype-pollution key (`__proto__`,
