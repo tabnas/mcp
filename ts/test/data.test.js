@@ -141,6 +141,27 @@ describe('data', () => {
       require('../package.json').version)
   })
 
+  it('server.json names the version that is actually published', () => {
+    // The MCP registry entry pins an exact version in two places, and the
+    // registry mirrors and caches what it is told — a stale entry advertises
+    // a version that may not exist. This is the same class of bug that left
+    // skills/mcp.json pinning @tabnas/mcp@0.1.0, a version tagged but never
+    // published, so every documented npx command 404'd.
+    //
+    // Derived on both sides: package.json is the source, server.json must
+    // agree, and a release that forgets to update it fails here rather than
+    // in a cache somewhere.
+    const server = JSON.parse(Fs.readFileSync(
+      Path.join(REPO_ROOT, 'server.json'), 'utf8'))
+    const pkg = require('../package.json')
+    assert.strictEqual(server.version, pkg.version,
+      'server.json version differs from package.json')
+    const npmPkg = server.packages.find((p) => 'npm' === p.registryType)
+    assert.strictEqual(npmPkg.identifier, pkg.name)
+    assert.strictEqual(npmPkg.version, pkg.version,
+      'server.json npm package version differs from package.json')
+  })
+
   it('repo layout: data/ lives at the repo root', () => {
     assert.strictEqual(Path.resolve(DATA_DIR),
       Path.resolve(Path.join(REPO_ROOT, 'data')))
