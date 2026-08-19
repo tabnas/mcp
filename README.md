@@ -129,6 +129,37 @@ Exit codes:
 | 1 | the operation said no: parse failure, invalid grammar, fixture failures, unknown plugin |
 | 2 | usage error: unknown flags or command, missing/unreadable files, malformed grammar JSON |
 
+## Passing a grammar that isn't already a GrammarSpec
+
+Every tool takes a **serialized GrammarSpec** — pure JSON. It does not take
+ABNF, EBNF, GBNF or jsonic source, and it never will: compiling those means
+running a compiler, and the tools' one hard rule is that a grammar is data,
+never code (ADR-10). Compile first, then pass the result.
+
+```js
+const { abnfConvert, toPureSpec } = require('@tabnas/abnf')
+
+const spec = toPureSpec(abnfConvert(abnfSource, { builtins: true }))
+// -> { options, rule, v, meta } — validates clean, safe to send
+```
+
+**Use `toPureSpec`.** It is the function for this, and the two obvious
+alternatives are both wrong:
+
+- `abnfCompile()` returns **jsonic text**, not an object. Useful for writing
+  a grammar file; not what a tool argument wants.
+- `abnfConvert()` alone returns a spec carrying `ref` (empty, when converted
+  with `builtins: true`) and mark fields. The firewall rejects the *presence*
+  of `ref`, not just its contents — deliberately, since "empty enough" is not
+  a property worth reasoning about at a security boundary — and `m` marks are
+  not part of the serialized form. `toPureSpec` strips both and stamps `v`.
+
+`toRecognitionSpec` is the same thing for a grammar that only needs to decide
+accept/reject, without the tree-building builtins.
+
+The equivalent for the other front-ends is `tabnas parse --grammar g.json`,
+where `g.json` is whatever your build step wrote.
+
 ## Grammar compatibility (`compare`)
 
 Two questions, reported separately, because they fail differently:
