@@ -1,25 +1,31 @@
 /* Copyright (c) 2026 tabnas, MIT License */
 
 /* data.ts
- * Loader for the bundled data/ files.
+ * Accessors for the bundled data/ files.
  *
  * The repo commits generated copies of the fleet's contract files in
  * data/ at the repo root (see tools/gen-data.js for why, and for how they
- * are regenerated). The build copies that directory into dist/data/, so
- * the ONE path this module reads — its own dist/data/ — works identically
- * in a repo checkout and in the published package. ts/test/data.test.js
- * keeps the copy honest (byte-compare against data/) and the committed
- * data honest (deep-compare against a regeneration from siblings).
+ * are regenerated). tools/embed-data.js then compiles that directory into
+ * src/data-bundle.ts, and this module reads ONLY from that import.
  *
- * Everything is read lazily and cached: the CLI should not pay for
- * plugins.json to run `tabnas parse`, and the files cannot change under
- * a running process (they are package contents, not state).
+ * A STATIC IMPORT, not readFileSync, because this code has to run in a
+ * runtime with no filesystem. The hosted Worker's `nodejs_compat` offers
+ * `node:fs`, but its virtual root holds only what was imported — a file
+ * read by path is not there at all. An import is the single form that
+ * resolves everywhere this package runs: Node for the CLI and the stdio
+ * server, workerd for the hosted endpoint. One path, so hosted and local
+ * cannot serve different bytes.
+ *
+ * ts/test/data.test.js keeps the embedded copy honest (byte-compare
+ * against data/) and the committed data honest (deep-compare against a
+ * regeneration from siblings).
+ *
+ * Parsed forms are cached: the CLI should not pay to parse plugins.json
+ * to run `tabnas parse`, and the text cannot change under a running
+ * process (it is program text, not state).
  */
 
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
-const DATA_DIR = join(__dirname, 'data')
+import { FILES, PACKAGE } from './data-bundle'
 
 // One error-code registry entry: message and hint templates.
 export type RegistryEntry = {
@@ -48,14 +54,18 @@ export type PluginIndex = {
   plugins: PluginDescriptor[]
 }
 
-const textCache: Record<string, string> = {}
 const jsonCache: Record<string, unknown> = {}
 
 function text(name: string): string {
-  if (!(name in textCache)) {
-    textCache[name] = readFileSync(join(DATA_DIR, name), 'utf8')
+  const found = FILES[name]
+  if (undefined === found) {
+    // Only reachable from a RESOURCES entry naming a file that
+    // embed-data did not emit, i.e. a data/ file deleted without
+    // updating the resource list. Say which, rather than serving
+    // `undefined` as a resource body.
+    throw new Error(`no bundled data file: ${name}`)
   }
-  return textCache[name]
+  return found
 }
 
 function json(name: string): unknown {
@@ -65,9 +75,11 @@ function json(name: string): unknown {
   return jsonCache[name]
 }
 
-// The directory the bundled files are read from (dist/data).
-export function dataDir(): string {
-  return DATA_DIR
+// The names of every bundled file, sorted. There is no directory to list
+// any more, and the test suite needs the embedded set without a
+// hand-kept copy of it.
+export function dataNames(): string[] {
+  return Object.keys(FILES).sort()
 }
 
 // Parsed data/error-codes.json.
@@ -101,9 +113,8 @@ export function rawData(name: string): string {
   return text(name)
 }
 
-// This package's own manifest (name/version — the MCP server identity).
+// This package's own manifest (name/version — the MCP server identity),
+// embedded from package.json at build time.
 export function packageInfo(): { name: string; version: string } {
-  const pkg = JSON.parse(
-    readFileSync(join(__dirname, '..', 'package.json'), 'utf8'))
-  return { name: pkg.name, version: pkg.version }
+  return { name: PACKAGE.name, version: PACKAGE.version }
 }

@@ -22,15 +22,20 @@ structural grammar validation is runtime behaviour of
 |---|---|
 | `ts/src/core.ts` | The six data operations. **The ONLY place operation logic lives.** |
 | `ts/src/compat.ts` | The seventh operation, grammar compatibility (plan Phase 5). Its own module because it is the only one that loads TWO grammars and runs them against each other; it reuses core's firewall, bounds and instance builder rather than a copy. |
-| `ts/src/mcp.ts` | MCP front-end: seven tools + five resources over stdio. Package main; importing it must never touch stdio (the transport starts only under `require.main`). Exports `main()` — the CLI's `mcp` subcommand starts the identical server through it. |
+| `ts/src/mcp.ts` | MCP front-end: the surface from `tools.ts`, served over **stdio only**. Package main; importing it must never touch stdio (the transport starts only under `require.main`). Exports `main()` — the CLI's `mcp` subcommand starts the identical server through it. |
 | `ts/src/cli.ts` | The `tabnas` CLI front-end: argument plumbing, human rendering, exit codes. The `mcp` subcommand lazily requires `mcp.ts` and runs the stdio server (so the data-command fast paths never load the MCP SDK). |
-| `ts/src/data.ts` | Loader for the bundled data (reads `ts/dist/data/`, the build-time copy of `data/`). |
+| `ts/src/tools.ts` | The tool + resource **surface**: `TOOLS`, `RESOURCES`, `callTool`. No transport. Both front-ends import it, so neither drags in the other's transport — the reason the Worker can exist at all. |
+| `ts/src/data.ts` | Accessors for the bundled data. Reads a static import, never the filesystem (the Worker has none). |
+| `ts/src/data-bundle.ts` | **Generated, gitignored.** `data/` compiled into a module by `tools/embed-data.js`. |
+| `ts/src/grammar-validator.js` | **Generated, gitignored.** `data/grammar.schema.json` precompiled by Ajv (`tools/build-validator.js`), because Workers forbid `new Function`. |
 | `ts/tools/gen-data.js` | Regenerates `data/` from sibling checkouts (`../<repo>`). `npm run gen-data`. |
-| `ts/tools/copy-data.js` | Build step: copies `data/` into `ts/dist/data/` so the bundle actually ships (npm files are `LICENSE` + `dist` only). |
+| `ts/tools/embed-data.js` | Build step: compiles `data/` + the package version into `ts/src/data-bundle.ts`. |
+| `ts/tools/build-validator.js` | Build step: precompiles the grammar schema into `ts/src/grammar-validator.js`. |
 | `data/` | **Bundled, generated, committed** copies of the fleet contract files: `grammar.schema.json`, `diagnostic.schema.json`, `error-codes.json`, `DIVERGENCE.md`, `plugins.json`. Never edit by hand. |
 | `ts/test/` | `node --test` suites, CJS. `golden.test.js` is the front-end parity gate. |
 | `benchmark/` | The AX benchmark (plan E1): ten agent tasks, their starting state, and a machine check per task. `--self-test` runs as part of `npm test` and measures **the benchmark**, not any agent. See [`benchmark/README.md`](benchmark/README.md). |
-| `ts/src/worker.ts` | The **hosted** endpoint (plan Phase 4): streamable-HTTP MCP at `POST /mcp`, plus `/health` and `/.well-known/mcp`. Transport, budget and shape-only telemetry ONLY — every parsing decision is the same core, so hosted and local cannot diverge. |
+| `ts/src/worker.ts` | The **hosted** endpoint (plan Phase 4): streamable-HTTP MCP at `POST /mcp`, plus `/health` and `/.well-known/mcp`. Transport ONLY — every parsing decision is the same core, so hosted and local cannot diverge. Its exports must all be functions (see below). |
+| `ts/src/budget.ts` | The hosted endpoint's limits and shape-only telemetry. Separate from `worker.ts` because workerd rejects a non-function named export on a Worker entrypoint. |
 | `wrangler.json` | The hosted Worker's deploy config (`mcp.tabnas.dev`). Separate from the website's Worker on purpose. |
 | `ci/ci.yml` | The staged CI workflow (see "CI"). |
 
@@ -128,12 +133,20 @@ Sibling links (npm install clobbers them; re-make after every install):
 
 ```bash
 rm -rf node_modules/@tabnas/parser node_modules/@tabnas/support
-ln -s ../../../parser/ts node_modules/@tabnas/parser
-ln -s ../../../support/ts node_modules/@tabnas/support
+ln -s ../../../../parser/ts node_modules/@tabnas/parser
+ln -s ../../../../support/ts node_modules/@tabnas/support
 ```
 
 `@tabnas/parser` and `@tabnas/support` are peerDependencies (`>=0`) and
 devDependencies (`*`), fleet convention.
+
+`core.ts` and `cli.ts` import `@tabnas/support` by **subpath**
+(`/spec`, `/expect`), never the barrel. The barrel re-exports the fixture
+runner, which imports `node:test`: taking it here would load Node's test
+runner into every `tabnas` command, and would make this package
+unbundlable for the Worker, where `node:test` does not exist. That needs
+`@tabnas/support` with the subpath exports (>= 0.3.2), so support
+publishes before mcp in a release wave.
 
 ## Verify your work
 
@@ -148,7 +161,8 @@ What "correct" means here, in order of authority:
    are the reason this repo exists as one codebase.
 2. **The staleness gates pass**: `data/` regenerates identically from
    the siblings (skipped, loudly, when no siblings are checked out) and
-   `ts/dist/data/` is byte-identical to `data/`.
+   the embedded bundle the code actually serves is byte-identical to
+   `data/`, over exactly the same set of files.
 3. **The firewall tests pass**: prototype-pollution keys, `ref` grammars,
    non-builtin FuncRefs, `plugins` (request and grammar.options), and
    over-cap grammars are rejected in every operation that takes a grammar
@@ -170,8 +184,44 @@ exists for convenience, not as a general remote parser API.
 
 It is deliberately thin: transport, request validation, budget enforcement
 and telemetry. Every parsing decision is the shared core, so hosted and local
-answer identically; `test/worker.test.js` pins that by comparing a hosted
+answer identically; `test/worker.test.js` pins that under Node and
+`test/workerd.test.js` pins it again **in workerd**, comparing a hosted
 `tools/call` result byte-for-byte against `callTool()`.
+
+### Node is not the runtime, and a Node test cannot tell you it deploys
+
+`test/worker.test.js` calls `handle()` as a plain function under Node. That
+covers the logic and none of the runtime, and four separate defects once sat
+green in a 130-test suite while making the Worker undeployable:
+
+- an import of `node:test` (via the `@tabnas/support` barrel) — a module
+  workerd does not implement, so the bundle would not build;
+- CommonJS output — no default export, so wrangler read the Worker as
+  service-worker format;
+- `readFileSync` in `data.ts` — there is no filesystem, so `/health` and
+  every resource read would have thrown;
+- a number exported from the entry module — workerd type-checks named
+  exports and refuses anything that is not a function or handler;
+- Ajv's runtime `new Function` — Workers forbid code generation from
+  strings, which broke every grammar-accepting tool.
+
+**`test/workerd.test.js` is the gate.** It boots the real `wrangler.json` in
+real workerd and speaks HTTP to it. It costs seconds and it is the only test
+whose failure means "this will not deploy". Do not weaken it into a skip.
+
+The constraints it enforces, which any change to the hosted path must keep:
+
+- **No filesystem.** Bundled data reaches the Worker by static import
+  (`data-bundle.ts`), never by path. Cloudflare's `nodejs_compat` does offer
+  `node:fs`, backed by a virtual root at `/bundle` that holds only what was
+  imported — so a file read by path is not merely unreadable, it is absent.
+- **No code generation from strings.** No `eval`, no `new Function`. The
+  grammar schema is precompiled at build time (`build-validator.js`). This
+  is the same rule ADR-10 states for grammars, enforced by the platform.
+- **The entry module exports handlers only.** Constants live in
+  `budget.ts`.
+- **No transport imports another transport.** `worker.ts` takes the surface
+  from `tools.ts`, never from `mcp.ts`.
 
 Four rules this file must keep:
 
@@ -182,9 +232,21 @@ Four rules this file must keep:
    There is no shell, no filesystem, no outbound network, and no way to add
    one that is worth having.
 2. **Limits are correctness, not tuning.** A 256 KB body cap sits in front of
-   the core's own `MAX_GRAMMAR_RULES` and `MAX_TEST_ROWS`. A breach answers
-   with `code: "limit_exceeded"`, naming the limit, the ceiling and the local
-   alternative — an agent has to be able to correct rather than guess.
+   the core's own `MAX_GRAMMAR_RULES` and `MAX_TEST_ROWS`, and a per-IP rate
+   limit sits in front of both. A breach answers with `code:
+   "limit_exceeded"` or `code: "rate_limited"`, naming the limit, the
+   ceiling and the local alternative — an agent has to be able to correct
+   rather than guess.
+
+   The rate limit is a `ratelimits` binding in `wrangler.json`, so the
+   platform enforces it and the Worker only reports it: `embed-data.js`
+   reads the numbers out of that file into the bundle, and the build
+   **fails** if the binding is absent, because an unlimited public parser
+   must not be a thing a config slip can produce. It is checked before the
+   body is read and before the size caps — otherwise a rejected oversized
+   request is free, and the cap becomes the cheap way to hammer the
+   service. `/health` and `/.well-known/mcp` are deliberately outside it: a
+   client that cannot check liveness cannot back off intelligently.
 3. **Telemetry records shape, never content.** Tool name, size *bucket*,
    duration, status, error code. Not a byte count (an exact size is a weak
    fingerprint of a document) and never any of the document. The test
@@ -195,7 +257,14 @@ Four rules this file must keep:
 
 Deploying is a maintainer action — an agent session has no Cloudflare
 credentials. `npm run worker-dev` runs it locally; `npm run worker-deploy`
-is the deploy, and the custom domain in `wrangler.json` has to exist first.
+is the deploy, and the custom domain in `wrangler.json` has to exist first
+(`workers_dev` is false, so there is no fallback hostname).
+
+`wrangler.json`'s `main` is `ts/src/worker.ts` — wrangler bundles the
+TypeScript itself. Deliberate: `tsc` emits CommonJS for the npm package, and
+a Worker must be an ES module. Pointing wrangler at `dist/` would deploy the
+wrong module format; pointing it at the source keeps one set of sources
+behind both, with `tsc --build` still doing the type-checking.
 
 ## CI
 

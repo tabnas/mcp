@@ -1,2 +1,9 @@
 node_modules
 dist
+
+# wrangler local state (dev cache, deploy metadata)
+.wrangler
+
+# generated into ts/src by the build (sources of truth: data/ and package.json)
+ts/src/data-bundle.ts
+ts/src/grammar-validator.js

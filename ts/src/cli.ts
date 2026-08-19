@@ -22,7 +22,9 @@
 
 import { readFileSync, statSync } from 'node:fs'
 
-import { loadSpec, loadSpecDir } from '@tabnas/support'
+// Subpath import, not the barrel: '@tabnas/support' re-exports the
+// fixture runner and so drags `node:test` into every `tabnas` command.
+import { loadSpec, loadSpecDir } from '@tabnas/support/spec'
 
 import {
   parseDetailed,

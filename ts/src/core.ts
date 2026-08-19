@@ -26,15 +26,30 @@
 import { Tabnas, BUILTIN_REFS } from '@tabnas/parser'
 import type { TabnasErrorJSON } from '@tabnas/parser'
 
+// Subpath imports, NOT the '@tabnas/support' barrel. The barrel
+// re-exports the fixture runner, which imports `node:test`: importing it
+// here would load Node's test runner into every CLI invocation and every
+// MCP server process, and would make this file unbundlable for the
+// hosted Worker, where `node:test` does not exist. The pieces below are
+// the runtime-safe ones.
+import { parseSpec } from '@tabnas/support/spec'
 import {
-  parseSpec, isErrorExpect, errorCode, parseExpect, equalValue, formatValue,
-} from '@tabnas/support'
+  isErrorExpect, errorCode, parseExpect, equalValue, formatValue,
+} from '@tabnas/support/expect'
 
-import Ajv2020 from 'ajv/dist/2020'
-import type { ValidateFunction, ErrorObject } from 'ajv/dist/2020'
+import type { ErrorObject } from 'ajv/dist/2020'
+
+// The Ajv validator for data/grammar.schema.json, PRECOMPILED at build
+// time by tools/build-validator.js. Ajv normally compiles a schema by
+// calling `new Function` on generated source; the hosted Worker forbids
+// code generation from strings, so a runtime `ajv.compile()` here fails
+// on every grammar-accepting tool once deployed. Compiling ahead of
+// time is Ajv's own answer (ajv/dist/standalone) and changes nothing
+// observable: same generated code, same ErrorObject shapes.
+import grammarValidate from './grammar-validator'
 
 import {
-  errorRegistry, grammarSchema, pluginIndex, PluginDescriptor,
+  errorRegistry, pluginIndex, PluginDescriptor,
 } from './data'
 
 
@@ -341,18 +356,21 @@ function scanGrammarRefs(gs: Record<string, unknown>): ValidationIssue[] {
 }
 
 
-// Ajv (draft 2020-12) over data/grammar.schema.json, compiled once. Ajv
-// is a REGULAR dependency: structural validation is runtime behaviour of
-// validate_grammar, not test tooling. The engine's no-dependency rule
-// does not apply to this repo (it is tooling, not the engine).
-let grammarValidator: ValidateFunction | null = null
+// The compiled validator's call shape. The generated module has no
+// types of its own, and this is the whole of what core uses: call it,
+// then read `.errors` when it says no.
+type CompiledValidator = {
+  (data: unknown): boolean
+  errors?: ErrorObject[] | null
+}
 
-function structuralValidator(): ValidateFunction {
-  if (null == grammarValidator) {
-    const ajv = new Ajv2020({ allErrors: true })
-    grammarValidator = ajv.compile(grammarSchema())
-  }
-  return grammarValidator
+// Ajv is still a REGULAR dependency: the precompiled function requires
+// Ajv's runtime helpers (equal, ucs2length, ...). Structural validation
+// is runtime behaviour of validate_grammar, not test tooling. The
+// engine's no-dependency rule does not apply to this repo (it is
+// tooling, not the engine).
+function structuralValidator(): CompiledValidator {
+  return grammarValidate as unknown as CompiledValidator
 }
 
 function pathOfPointer(pointer: string): string {

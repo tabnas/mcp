@@ -17,7 +17,12 @@ const { describe, it, before, after } = require('node:test')
 const assert = require('node:assert')
 
 const worker = require('../dist/worker')
-const { handle, MAX_BODY_BYTES, setTelemetrySink } = worker
+const { handle } = worker
+// Limits and the telemetry sink come from budget.js, not the entry
+// module: workerd refuses a non-function named export on a Worker
+// entrypoint, so worker.ts must not export the constant.
+const { MAX_BODY_BYTES, RATE_LIMIT, setTelemetrySink } =
+  require('../dist/budget')
 
 const GRAMMAR = require('./json-grammar.fixture.json')
 
@@ -202,5 +207,62 @@ describe('hosted worker: telemetry records shape, never content', () => {
     await rpc('tools/call', { name: 'parse', arguments: { input: '{"a":}', grammar: GRAMMAR } })
     assert.strictEqual(seen[0].status, 'error')
     assert.strictEqual(seen[0].code, 'unexpected')
+  })
+})
+
+describe('hosted worker: rate limiting', () => {
+  // The binding itself is the platform's, and workerd.test.js proves it is
+  // bound and enforcing. What belongs here is the branch: given a limiter
+  // that says no, does the endpoint refuse correctly and correctably?
+  const refusing = { MCP_LIMIT: { limit: async () => ({ success: false }) } }
+  const allowing = { MCP_LIMIT: { limit: async () => ({ success: true }) } }
+
+  const call = (env, path = '/mcp') => handle(new Request(
+    'https://mcp.tabnas.dev' + path,
+    { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
+    env)
+
+  it('refuses with 429 and a structured, correctable body', async () => {
+    const res = await call(refusing)
+    assert.strictEqual(res.status, 429)
+    const body = await res.json()
+    assert.strictEqual(body.code, 'rate_limited')
+    assert.strictEqual(body.ceiling, RATE_LIMIT.limit)
+    assert.strictEqual(body.period_seconds, RATE_LIMIT.period)
+    // The refusal has to name the way out, or an agent can only retry.
+    assert.match(body.hint, /npx --yes @tabnas\/mcp mcp/)
+  })
+
+  it('passes the request through when the limiter allows it', async () => {
+    const res = await call(allowing)
+    assert.strictEqual(res.status, 200)
+  })
+
+  it('bills a request that would have been rejected for size', async () => {
+    // Order matters: if the size cap ran first, an attacker would get
+    // unlimited free 413s and the cap would become the cheap way in.
+    const res = await handle(new Request('https://mcp.tabnas.dev/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json',
+        'content-length': String(MAX_BODY_BYTES + 1) },
+      body: 'x'.repeat(MAX_BODY_BYTES + 1),
+    }), refusing)
+    assert.strictEqual(res.status, 429, 'size cap ran before the rate limit')
+  })
+
+  it('does not rate limit health or discovery', async () => {
+    for (const path of ['/health', '/.well-known/mcp']) {
+      const res = await handle(
+        new Request('https://mcp.tabnas.dev' + path), refusing)
+      assert.strictEqual(res.status, 200, path + ' was rate limited')
+    }
+  })
+
+  it('serves unlimited when no binding is present', async () => {
+    // A missing binding must not take the endpoint down; workerd.test.js
+    // is what proves the binding is really there in the deployed config.
+    const res = await call(undefined)
+    assert.strictEqual(res.status, 200)
   })
 })

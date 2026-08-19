@@ -26,61 +26,44 @@
 // for you, run `npx @tabnas/mcp` locally; that is the recommended path
 // regardless, and it is free, private and reproducible.
 
-import { callTool, TOOLS, RESOURCES } from './mcp'
+// From tools.ts, NOT mcp.ts: the surface without the stdio transport.
+// Importing './mcp' would pull the MCP SDK's stdio server and its
+// `require.main === module` bootstrap into this bundle — a transport
+// with no stdin to read, in a runtime with no main module.
+import { callTool, TOOLS, RESOURCES } from './tools'
 
 import { MAX_CORPUS, MAX_GENERATED } from './compat'
 import { packageInfo, rawData } from './data'
 
-// --- budget -----------------------------------------------------------------
+// Limits and telemetry live in budget.ts, and are imported rather than
+// re-exported: workerd rejects a non-function named export on the entry
+// module, so `MAX_BODY_BYTES` must not appear in this file's exports.
+import {
+  MAX_BODY_BYTES, RATE_LIMIT, limitExceeded, rateLimited, bucket, emit,
+  type Telemetry,
+} from './budget'
 
-// Parsing attacker-controlled text on shared infrastructure means limits are
-// correctness, not tuning. The two that the engine itself enforces
-// (MAX_GRAMMAR_RULES, MAX_TEST_ROWS) live in core; these are the transport's.
-export const MAX_BODY_BYTES = 256 * 1024
 
-// A limit breach answers with a documented, structured diagnostic rather than
-// a bare 413: an agent has to be able to correct rather than guess, which
-// means it needs the ceiling and which limit it hit.
-function limitExceeded(limit: string, ceiling: number, actual: number) {
-  return {
-    status: 'failure' as const,
-    code: 'limit_exceeded',
-    limit,
-    ceiling,
-    actual,
-    message: `request exceeds the ${limit} limit of ${ceiling}`,
-    hint:
-      `The hosted endpoint bounds ${limit} at ${ceiling}. Run the same tool ` +
-      'locally with `npx --yes @tabnas/mcp mcp` for unbounded input — it is ' +
-      'the same code with the same answers.',
-  }
+// --- bindings ---------------------------------------------------------------
+
+// Cloudflare's rate limiter, declared as `ratelimits` in wrangler.json.
+// Typed structurally rather than imported: the binding is the platform's,
+// and this is the whole of the surface used.
+export type RateLimiter = {
+  limit(options: { key: string }): Promise<{ success: boolean }>
 }
 
-// --- telemetry --------------------------------------------------------------
-
-export type Telemetry = {
-  tool: string
-  bytes_bucket: string
-  duration_ms: number
-  status: 'ok' | 'error'
-  code?: string
+export type Env = {
+  MCP_LIMIT?: RateLimiter
 }
 
-// Size as a BUCKET, never a length: an exact byte count of a document is a
-// weak fingerprint of the document, and this service promises not to hold
-// facts about content.
-function bucket(bytes: number): string {
-  if (bytes <= 1024) return '<=1k'
-  if (bytes <= 16 * 1024) return '<=16k'
-  if (bytes <= 64 * 1024) return '<=64k'
-  return '<=256k'
-}
-
-// Overridable so tests can observe what would be emitted, and so a deploy can
-// wire a sink without this file knowing about one.
-export let emit: (t: Telemetry) => void = () => {}
-export function setTelemetrySink(sink: (t: Telemetry) => void): void {
-  emit = sink
+// One bucket per client IP. At the edge `cf-connecting-ip` is set by
+// Cloudflare and overwrites whatever the caller sent, so it cannot be
+// forged in production. Off-edge — local dev, and only local dev — there
+// is no one to set it: the fallback puts everything in one bucket, and
+// the tests exploit the pass-through to address separate buckets.
+function rateKey(request: Request): string {
+  return request.headers.get('cf-connecting-ip') ?? 'local'
 }
 
 // --- JSON-RPC ---------------------------------------------------------------
@@ -199,7 +182,7 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body) + '\n', { status, headers: JSON_HEADERS })
 }
 
-export async function handle(request: Request): Promise<Response> {
+export async function handle(request: Request, env?: Env): Promise<Response> {
   const url = new URL(request.url)
 
   if (request.method === 'OPTIONS') {
@@ -228,6 +211,8 @@ export async function handle(request: Request): Promise<Response> {
         body_bytes: MAX_BODY_BYTES,
         compare_corpus_rows: MAX_CORPUS,
         compare_generated_inputs: MAX_GENERATED,
+        requests_per_ip: RATE_LIMIT.limit,
+        rate_period_seconds: RATE_LIMIT.period,
       },
       privacy: 'Document content is never logged, stored, or used for training.',
       local: 'npx --yes @tabnas/mcp mcp',
@@ -239,6 +224,32 @@ export async function handle(request: Request): Promise<Response> {
   }
   if (request.method !== 'POST') {
     return json({ error: 'POST required' }, 405)
+  }
+
+  // BEFORE the body is read, and before the size caps. A rejected request
+  // must still cost the caller quota, or an attacker gets unlimited free
+  // 413s and the cap becomes the cheap way to hammer the service. Health
+  // and discovery are deliberately outside this: they are static, and a
+  // client that cannot check liveness cannot back off intelligently.
+  //
+  // Only the /mcp path can reach here. If the binding is absent the
+  // service still answers — failing closed on a missing binding would
+  // take the endpoint down for a config slip — so the workerd test
+  // asserts the binding IS bound and enforcing, which is what keeps an
+  // unlimited deploy from being possible quietly.
+  if (env?.MCP_LIMIT) {
+    const { success } = await env.MCP_LIMIT.limit({ key: rateKey(request) })
+    if (!success) {
+      emit({
+        tool: 'rate_limited',
+        bytes_bucket: bucket(
+          Number(request.headers.get('content-length') ?? '0')),
+        duration_ms: 0,
+        status: 'error',
+        code: 'rate_limited',
+      })
+      return json(rateLimited(), 429)
+    }
   }
 
   // Cap by declared length first — cheapest possible rejection — then by what
@@ -280,4 +291,6 @@ export async function handle(request: Request): Promise<Response> {
   return json(body)
 }
 
-export default { fetch: handle }
+export default {
+  fetch: (request: Request, env: Env) => handle(request, env),
+}

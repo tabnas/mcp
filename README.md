@@ -170,6 +170,22 @@ tabnas compare --a v1.json --b v2.json --corpus ../json/test/spec
 
 Exit code is 1 when any change is found, so it works as a release gate.
 
+## The hosted endpoint
+
+`mcp.tabnas.dev` serves the same seven tools over streamable HTTP
+(`POST /mcp`, plus `GET /health` and `GET /.well-known/mcp`), for agents
+that cannot run `npx`. **Local stdio stays the recommended path** — it is
+free, private, reproducible and unlimited.
+
+The hosted service is the same core, so it answers identically; it is
+also bounded, because it parses attacker-controlled text on shared
+infrastructure. A 256 KB body cap and 60 requests per minute per IP,
+both reported up front by `/.well-known/mcp` and named in the refusal
+(`limit_exceeded` / `rate_limited`) along with the local alternative.
+Document content is never logged, stored, or used for training;
+telemetry records shape only — tool name, size *bucket*, duration,
+status, error code.
+
 ## Bundled data
 
 Published packages do not carry the fleet's contract files (the parser's
@@ -184,9 +200,19 @@ registry, `DIVERGENCE.md`, and every fleet plugin descriptor
 cd ts && npm run gen-data
 ```
 
-The build copies `data/` into `ts/dist/data/` (that copy is what ships
-in the npm package and what the code reads), and the test suite fails on
-a stale regeneration or a stale copy. Derive, never duplicate (ADR-10).
+The build compiles `data/` into `ts/src/data-bundle.ts` (generated,
+gitignored) and the code reads that static import — never the
+filesystem, because the hosted Worker does not have one. The test suite
+fails on a stale regeneration or a stale embed, and checks the embedded
+set against the directory rather than a hand-kept list. Derive, never
+duplicate (ADR-10).
+
+`data/grammar.schema.json` gets the same treatment for a different
+reason: Ajv validates by generating JavaScript and calling
+`new Function`, which Cloudflare Workers forbid outright, so
+`tools/build-validator.js` precompiles the schema into
+`ts/src/grammar-validator.js` at build time. Same Ajv, same error
+shapes, compiled earlier.
 
 ## Build & test
 
@@ -196,13 +222,22 @@ npm install
 npm test        # builds first, then runs every test/*.test.js
 ```
 
+`npm test` ends with `test/workerd.test.js`, which boots the real
+`wrangler.json` in real workerd and speaks HTTP to it. It is the only
+test whose failure means "the hosted endpoint will not deploy", and it
+needs the `wrangler` devDependency (and the `workerd` binary npm
+installs alongside it). It adds a few seconds; a Node-level test cannot
+replace it, because every deploy-blocking defect this repo has had was
+green under Node.
+
 Working in the fleet layout (sibling checkouts beside this repo),
-symlink the siblings after `npm install` so you test against source:
+symlink the siblings after `npm install` so you test against source
+(npm replaces these on every install, so re-make them after one):
 
 ```bash
 rm -rf node_modules/@tabnas/parser node_modules/@tabnas/support
-ln -s ../../../parser/ts node_modules/@tabnas/parser
-ln -s ../../../support/ts node_modules/@tabnas/support
+ln -s ../../../../parser/ts node_modules/@tabnas/parser
+ln -s ../../../../support/ts node_modules/@tabnas/support
 ```
 
 ## CI

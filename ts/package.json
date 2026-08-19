@@ -24,7 +24,7 @@
     "tabnas": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsc --build src && node tools/copy-data.js",
+    "build": "node tools/embed-data.js && node tools/build-validator.js && tsc --build src",
     "watch": "tsc --build src -w",
     "clean": "rm -rf node_modules dist package-lock.json",
     "reset": "npm run clean && npm i && npm run build && npm test",
@@ -34,7 +34,7 @@
     "repo-publish": "npm run clean && npm i && npm run repo-publish-quick",
     "repo-publish-quick": "npm run build && npm run test && npm run repo-tag",
     "benchmark": "node ../benchmark/run.mjs",
-    "worker-dev": "wrangler dev --config ../wrangler.json",
+    "worker-dev": "npm run build && wrangler dev --config ../wrangler.json",
     "worker-deploy": "npm run build && wrangler deploy --config ../wrangler.json"
   },
   "files": [
@@ -51,13 +51,14 @@
   },
   "peerDependencies": {
     "@tabnas/parser": ">=0",
-    "@tabnas/support": ">=0"
+    "@tabnas/support": ">=0.3.2"
   },
   "devDependencies": {
     "@tabnas/parser": "*",
     "@tabnas/support": "*",
     "@types/node": "22.x",
-    "typescript": "5.x"
+    "typescript": "5.x",
+    "wrangler": "4.124.0"
   },
   "repository": {
     "type": "git",

@@ -1,5 +1,11 @@
 {
   "compilerOptions": {
+    // The precompiled Ajv validator (tools/build-validator.js) is
+    // generated JavaScript in src/; allowJs is what carries it into
+    // dist/ alongside the compiled TypeScript. checkJs stays off: it is
+    // machine-generated and not ours to type-check.
+    "allowJs": true,
+    "checkJs": false,
     "esModuleInterop": true,
     "module": "nodenext",
     "noEmitOnError": true,
