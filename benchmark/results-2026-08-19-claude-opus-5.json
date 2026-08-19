@@ -1,0 +1,123 @@
+{
+  "$comment": "AX benchmark scoring sheet. `completed` is decided by run.mjs --score; the rest are counted from the agent transcript. First real run, 2026-08-19.",
+  "agent": "Claude Opus 5 (Claude Code), via @tabnas/mcp@0.1.7 CLI",
+  "date": "2026-08-19",
+  "metrics": {
+    "completed": "did the task check pass",
+    "retries": "how many times the agent re-attempted after a failure",
+    "invalid_commands": "commands invoked that do not exist or were malformed",
+    "hallucinated_apis": "references to tabnas functions, flags or files that do not exist",
+    "docs_consulted": "documentation pages or resources opened",
+    "test_failures": "failing test or fixture runs before the final state",
+    "steps_to_first_parse": "agent actions until the first successful parse"
+  },
+  "results": [
+    {
+      "task": "01-install",
+      "completed": true,
+      "retries": 0,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": null
+    },
+    {
+      "task": "02-parse",
+      "completed": true,
+      "retries": 0,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": 1
+    },
+    {
+      "task": "03-create-grammar",
+      "completed": true,
+      "retries": 1,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": 1
+    },
+    {
+      "task": "04-fix-grammar",
+      "completed": true,
+      "retries": 0,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": 2
+    },
+    {
+      "task": "05-explain-failure",
+      "completed": true,
+      "retries": 0,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": null
+    },
+    {
+      "task": "06-add-rule",
+      "completed": true,
+      "retries": 0,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": 2
+    },
+    {
+      "task": "07-write-fixtures",
+      "completed": true,
+      "retries": 0,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": null
+    },
+    {
+      "task": "08-upgrade-plugin",
+      "completed": true,
+      "retries": 0,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": null
+    },
+    {
+      "task": "09-compare-grammars",
+      "completed": true,
+      "retries": 0,
+      "invalid_commands": 0,
+      "hallucinated_apis": 0,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": 1
+    },
+    {
+      "task": "10-integrate",
+      "completed": true,
+      "retries": 1,
+      "invalid_commands": 0,
+      "hallucinated_apis": 1,
+      "docs_consulted": 0,
+      "test_failures": 0,
+      "steps_to_first_parse": 2
+    }
+  ],
+  "notes": [
+    "03: first attempt validated and parsed but built [] \u2014 elem matched the token directly instead of descending into a value rule, so @push$ had nothing to push. Second attempt correct.",
+    "10: hallucinated tn.use(grammar). The real API is tn.grammar(). `use` DOES exist (it takes plugins), which is what makes the confusion easy \u2014 the wrong call is plausible, not absurd.",
+    "06: solved first try because the diagnostic's `expected` field listed the accepted tokens and #NR was absent from it. The single highest-value field in the diagnostic.",
+    "04: THE TASK PREMISE IS FALSE. It states grammar.json 'is rejected by tabnas validate'; it is not \u2014 validate returns {ok:true,v:2}. The defect is p:'mapp', a reference to a rule that does not exist, and validate does not check rule references. The engine raises unknown_rule at parse time. Either the task text or validate_grammar should change; see the run notes.",
+    "Tooling friction not attributable to tabnas: `npx --yes @tabnas/mcp@x` inside a shell variable failed twice under this harness. Installing once and calling the bin directly is markedly easier for an agent than the documented npx form."
+  ]
+}
