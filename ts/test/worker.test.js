@@ -47,6 +47,18 @@ describe('hosted worker: discovery', () => {
     assert.strictEqual(body.service, 'tabnas-mcp')
   })
 
+  it('answers HEAD on the read-only endpoints, not 404', async () => {
+    // Uptime monitors commonly probe with HEAD. Gating on GET alone sent
+    // them to the 404 fall-through, so a healthy service read as down.
+    for (const path of ['/health', '/.well-known/mcp']) {
+      const res = await handle(new Request('https://mcp.tabnas.dev' + path,
+        { method: 'HEAD' }))
+      assert.strictEqual(res.status, 200, `HEAD ${path}`)
+      // A HEAD response carries the headers of the GET and no body.
+      assert.match(res.headers.get('content-type'), /application\/json/)
+    }
+  })
+
   it('/.well-known/mcp states the tools, the limits and the privacy rule', async () => {
     const body = await (await get('/.well-known/mcp')).json()
     assert.strictEqual(body.transport, 'streamable-http')

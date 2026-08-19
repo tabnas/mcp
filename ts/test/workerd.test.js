@@ -102,6 +102,15 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
     assert.strictEqual(body.version, require('../package.json').version)
   })
 
+  it('answers HEAD on the read-only endpoints', async () => {
+    // Worth pinning in workerd too: whether a HEAD reaches the handler at
+    // all is the runtime's business, not the handler's.
+    for (const path of ['/health', '/.well-known/mcp']) {
+      const res = await worker.fetch(url(path), { method: 'HEAD' })
+      assert.strictEqual(res.status, 200, `HEAD ${path}`)
+    }
+  })
+
   it('serves discovery with its limits', async () => {
     const body = await (await get('/.well-known/mcp')).json()
     assert.strictEqual(body.transport, 'streamable-http')

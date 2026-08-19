@@ -189,13 +189,21 @@ export async function handle(request: Request, env?: Env): Promise<Response> {
     return new Response(null, { status: 204, headers: JSON_HEADERS })
   }
 
-  if (request.method === 'GET' && url.pathname === '/health') {
+  // HEAD alongside GET on both read-only endpoints. An uptime monitor or
+  // health checker that probes with HEAD — many do, it being the cheap
+  // way to ask "are you alive" — would otherwise fall through to the 404
+  // below and report the service down while it was serving fine.
+  // `Response` drops the body for a HEAD request on its own, so the
+  // handlers need no other change.
+  const readOnly = 'GET' === request.method || 'HEAD' === request.method
+
+  if (readOnly && url.pathname === '/health') {
     return json({ ok: true, service: 'tabnas-mcp', version: packageInfo().version })
   }
 
   // Discovery: what this endpoint is, and what it will not do. Stating the
   // limits here means a client can see the ceilings before it hits one.
-  if (request.method === 'GET' && url.pathname === '/.well-known/mcp') {
+  if (readOnly && url.pathname === '/.well-known/mcp') {
     return json({
       name: 'tabnas',
       version: packageInfo().version,
