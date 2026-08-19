@@ -71,6 +71,45 @@ tests are green. A short latency sample is reported, not failed.
 Two runs inside one minute share the 60/minute per-IP budget; the harness
 is sized so a single run cannot trip it, and says so plainly if it does.
 
+## On "staging first"
+
+Phase 4's exit criteria also asked for a staging environment. **This is a
+deliberate decision not to build one**, recorded here rather than left as
+an open item.
+
+What was tried: per-version preview URLs
+(`<version>-tabnas-mcp.<subdomain>.workers.dev`) via `preview_urls: true`.
+They 404 with Cloudflare error 1042, because preview URLs are served from
+the workers.dev subdomain and `workers_dev: false` disables it. Enabling it
+would give this Worker a permanent public `*.workers.dev` hostname — the
+exact thing `workers_dev: false` exists to prevent, since it would be a
+second, unrate-limited-by-hostname way to reach the same service outside
+the documented endpoint. Trading that for a staging URL is a bad deal.
+
+A separate staging Worker is worse again: its own rate-limit binding, its
+own config, its own drift, and nothing verified about it would be evidence
+about production, because it would not be the same deployment.
+
+What actually provides the assurance staging is *for*:
+
+1. **`test/workerd.test.js`** boots the real `wrangler.json` in real
+   workerd on every push. Every deploy-blocking defect this service has had
+   was caught by this class of check, and none by a Node test.
+2. **`benchmark/parity.mjs`** asserts the DEPLOYED endpoint answers
+   byte-identically to local core, across every tool. Run it after any
+   deploy.
+3. **`wrangler rollback`** is one command, and the previous version is
+   always there.
+
+The gap that remains, honestly stated: there is no way to exercise a build
+against production infrastructure *before* it takes traffic. For a
+stateless service with no database to migrate, no session to drain, and a
+one-command rollback, that gap is small — and it is bounded by running
+parity immediately after each deploy, which is what the criterion was
+really protecting against.
+
+Revisit this if the service ever grows state.
+
 ## When a target is missed
 
 There is no pager and no on-call. The honest response, in order:
