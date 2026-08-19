@@ -222,6 +222,40 @@ describe('hosted worker: telemetry records shape, never content', () => {
   })
 })
 
+describe('hosted worker: the default telemetry sink', () => {
+  // The sink used to be a no-op, so nothing was ever emitted and nothing
+  // could leak. Now it writes to the Worker log stream, which makes it the
+  // line that publishes — so what it can carry is worth pinning.
+  //
+  // Calls defaultSink directly rather than through the `emit` binding:
+  // `emit` is mutable by design (setTelemetrySink), other suites in this
+  // file replace it, and a test of the default must not depend on whether
+  // one of them ran first.
+  const budget = require('../dist/budget')
+
+  it('emits one JSON line carrying shape only', () => {
+    const lines = []
+    const real = console.log
+    console.log = (s) => lines.push(s)
+    try {
+      budget.defaultSink({
+        tool: 'parse', bytes_bucket: '<=1k', duration_ms: 3, status: 'ok',
+      })
+    } finally {
+      console.log = real
+    }
+    assert.strictEqual(lines.length, 1)
+    const rec = JSON.parse(lines[0])
+    // An exhaustive key list, deliberately. A new field reaching this
+    // record is a privacy decision, and it should fail here first — the
+    // published policy at tabnas.dev/privacy names exactly these.
+    assert.deepStrictEqual(Object.keys(rec).sort(),
+      ['bytes_bucket', 'duration_ms', 'status', 'tabnas', 'tool'])
+    // A bucket, never a length: an exact byte count fingerprints a document.
+    assert.match(rec.bytes_bucket, /^<=\d+k$/)
+  })
+})
+
 describe('hosted worker: rate limiting', () => {
   // The binding itself is the platform's, and workerd.test.js proves it is
   // bound and enforcing. What belongs here is the branch: given a limiter

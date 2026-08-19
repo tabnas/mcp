@@ -68,9 +68,32 @@ const url = (path) => 'https://mcp.tabnas.dev' + path
 
 const get = (path) => worker.fetch(url(path))
 
+// Every request in this file carries a per-RUN client address, because the
+// limiter's counters outlive the workerd instance: two runs inside the same
+// 60-second window otherwise share a bucket, and the later tests in the
+// file start with the earlier runs' requests already counted. That is not
+// hypothetical — running this file three times in a row put the shared
+// default bucket over the ceiling and failed five unrelated assertions
+// (resource reads, byte parity, the ref refusal) with 429s that looked like
+// real defects.
+//
+// A pid-derived address in 10.0.0.0/8 is obviously synthetic and never
+// routable. Off-edge nobody sets cf-connecting-ip, so the header passes
+// through; at the edge Cloudflare overwrites it, which is why this is safe
+// to rely on in a test and impossible to forge in production.
+const RUN = process.pid
+const ip = (n) => `10.${RUN % 251}.${(RUN >> 8) % 251}.${n}`
+const IP_DEFAULT = ip(1)   // everything that is not about rate limiting
+const IP_BURST = ip(2)     // the test that deliberately exhausts a bucket
+const IP_OTHER = ip(3)     // proves buckets are per-IP, not global
+
 const post = (body, headers) => worker.fetch(url('/mcp'), {
   method: 'POST',
-  headers: { 'content-type': 'application/json', ...(headers ?? {}) },
+  headers: {
+    'content-type': 'application/json',
+    'cf-connecting-ip': IP_DEFAULT,
+    ...(headers ?? {}),
+  },
   body: 'string' === typeof body ? body : JSON.stringify(body),
 })
 
@@ -79,6 +102,7 @@ const post = (body, headers) => worker.fetch(url('/mcp'), {
 // rate-limit test would starve the rest. Each test that cares gets its
 // own address.
 const postAs = (ip, body) => post(body, { 'cf-connecting-ip': ip })
+
 
 const rpc = async (method, params, id = 1) =>
   (await post({ jsonrpc: '2.0', id, method, params })).json()
@@ -197,7 +221,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
       const tick = { jsonrpc: '2.0', id: 1, method: 'tools/list' }
       let refusedAt = -1
       for (let i = 1; i <= LIMITER.limit + 5; i++) {
-        const res = await postAs('203.0.113.7', tick)
+        const res = await postAs(IP_BURST, tick)
         if (429 === res.status) {
           refusedAt = i
           const body = await res.json()
@@ -217,13 +241,15 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
       // is a configuration gate — the binding is attached and carries
       // these numbers — not a promise about edge behaviour.
       assert.strictEqual(refusedAt, LIMITER.limit + 1,
-        'refused at the wrong request number')
+        'refused at the wrong request number — if this run reused a ' +
+        'previous run\'s bucket the count starts part-used, which is why ' +
+        'the address is derived per run')
     })
 
   it('buckets per IP rather than globally', async () => {
     // A global counter would look identical until the first two clients
     // arrive, then take the service down for everyone at once.
-    const res = await postAs('203.0.113.8',
+    const res = await postAs(IP_OTHER,
       { jsonrpc: '2.0', id: 1, method: 'tools/list' })
     assert.strictEqual(res.status, 200,
       'a second IP was refused: the limiter is keyed globally')

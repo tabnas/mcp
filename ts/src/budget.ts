@@ -95,7 +95,29 @@ export function bucket(bytes: number): string {
 
 // Overridable so tests can observe what would be emitted, and so a deploy can
 // wire a sink without this file knowing about one.
-export let emit: (t: Telemetry) => void = () => {}
+// The default sink writes one structured line to the Worker's own log
+// stream, which `observability.enabled` in wrangler.json persists and
+// `wrangler tail` streams live. Previously this was `() => {}` — every
+// record built above was computed and dropped, so the service had the
+// telemetry it was designed around and emitted none of it.
+//
+// `console.log` IS the transport on Workers; there is no agent to install
+// and no endpoint to configure, which is what makes a default sink the
+// right default rather than a dependency. Emitting JSON keeps it queryable
+// in the dashboard instead of being prose someone has to grep.
+//
+// SAFE BY CONSTRUCTION: `Telemetry` has no field that can hold content —
+// tool name, size BUCKET, duration, status, error code. Widening that type
+// is the moment to re-read PRIVACY in worker.ts and /privacy on the site,
+// because this line is what would publish the new field.
+export function defaultSink(t: Telemetry): void {
+  console.log(JSON.stringify({ tabnas: 'mcp', ...t }))
+}
+
+export let emit: (t: Telemetry) => void = defaultSink
+
+// Overridable so tests can observe what would be emitted, and so a deploy
+// can wire a different sink without this file knowing about one.
 export function setTelemetrySink(sink: (t: Telemetry) => void): void {
   emit = sink
 }

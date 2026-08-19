@@ -6,7 +6,6 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "observability": { "enabled": true },
-  "placement": { "mode": "smart" },
   "limits": { "cpu_ms": 200 },
   "ratelimits": [
     { "name": "MCP_LIMIT", "namespace_id": "1001",

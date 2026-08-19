@@ -245,11 +245,16 @@ ln -s ../../../../support/ts node_modules/@tabnas/support
 
 ## CI
 
-The intended workflow is staged at [`ci/ci.yml`](ci/ci.yml) — a caller
-of the org's `tabnas/.github` `polyglot-ci.yml` (ts-only, with `parser`
-and `support` cloned as siblings). Automation cannot push workflow
-files (admin ADR-8), so a maintainer promotes `ci/ci.yml` to
-`.github/workflows/ci.yml` via the admin rollout scripts.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — a caller of the
+org's `tabnas/.github` `polyglot-ci.yml` (ts-only, with `parser` and
+`support` cloned as siblings), promoted from `ci/ci.yml` in `0abc17e`.
+Automation cannot push workflow files (admin ADR-8), so any future change
+is staged in `ci/` for a maintainer to promote via the admin rollout
+scripts.
+
+CI runs `test/workerd.test.js`, which boots the real `wrangler.json` in
+real workerd — so the hosted endpoint's deployability is gated on every
+push, not discovered at deploy time.
 
 ## License
 
