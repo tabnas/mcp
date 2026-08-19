@@ -200,6 +200,13 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
       assert.notStrictEqual(refusedAt, -1,
         `no 429 within ${LIMITER.limit + 5} requests: the MCP_LIMIT ` +
         'binding is missing or not enforcing')
+      // Exact here because miniflare's limiter is a deterministic local
+      // counter. PRODUCTION IS NOT EXACT: Cloudflare counts per key PER
+      // DATA CENTRE and approximately, so a live burst can pass well
+      // beyond the ceiling before refusals begin (measured: ~125 of 150
+      // concurrent requests served before the first 429). This assertion
+      // is a configuration gate — the binding is attached and carries
+      // these numbers — not a promise about edge behaviour.
       assert.strictEqual(refusedAt, LIMITER.limit + 1,
         'refused at the wrong request number')
     })

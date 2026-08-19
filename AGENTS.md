@@ -239,7 +239,9 @@ Four rules this file must keep:
    rather than guess.
 
    The rate limit is a `ratelimits` binding in `wrangler.json`, so the
-   platform enforces it and the Worker only reports it: `embed-data.js`
+   platform enforces it — per key **per data centre**, and approximately,
+   so treat it as a shield against sustained abuse rather than an exact
+   quota — and the Worker only reports it: `embed-data.js`
    reads the numbers out of that file into the bundle, and the build
    **fails** if the binding is absent, because an unlimited public parser
    must not be a thing a config slip can produce. It is checked before the

@@ -182,6 +182,9 @@ also bounded, because it parses attacker-controlled text on shared
 infrastructure. A 256 KB body cap and 60 requests per minute per IP,
 both reported up front by `/.well-known/mcp` and named in the refusal
 (`limit_exceeded` / `rate_limited`) along with the local alternative.
+The rate limit is Cloudflare's, which counts per IP **per data centre**
+and approximately — so it is a shield against sustained abuse, not an
+exact quota, and a short burst may exceed 60 before refusals begin.
 Document content is never logged, stored, or used for training;
 telemetry records shape only — tool name, size *bucket*, duration,
 status, error code.
