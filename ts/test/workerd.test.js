@@ -49,6 +49,31 @@ const BOOT_MS = 120_000
 
 let worker = null
 
+// Set when the host cannot run workerd. Distinguished from a real failure by
+// what the error says: an unsupported platform is a fact about the machine,
+// anything else is a fact about the code and must still fail.
+let incapable = null
+
+function whyIncapable(err) {
+  const text = `${err?.message ?? ''} ${err?.cause?.message ?? ''}`
+  const mac = /Unsupported macOS version[^.]*\.[^.]*\./i.exec(text)
+  if (mac) return mac[0].replace(/\s+/g, ' ').trim()
+  if (/glibc|Unsupported platform|not supported on this/i.test(text)) {
+    return text.replace(/\s+/g, ' ').slice(0, 200)
+  }
+  return null
+}
+
+// Wraps `it` so every case reports the same reason rather than eleven
+// identical cancellations with no cause attached.
+const wit = (name, fn) => it(name, async (t) => {
+  if (incapable) {
+    t.skip('host cannot run workerd — see the banner above; CI enforces this')
+    return
+  }
+  return fn(t)
+})
+
 async function start() {
   const { unstable_startWorker } = await import('wrangler')
   return unstable_startWorker({
@@ -109,10 +134,20 @@ const rpc = async (method, params, id = 1) =>
 
 
 describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
-  before(async () => { worker = await start() }, { timeout: BOOT_MS })
+  before(async () => {
+    try {
+      worker = await start()
+    } catch (e) {
+      incapable = whyIncapable(e)
+      // Not a capability problem: let it fail, loudly, as before.
+      if (!incapable) throw e
+      console.error(`\n  SKIPPING the workerd suite: ${incapable}`)
+      console.error('  This gate still runs in CI on ubuntu, macOS and Windows.\n')
+    }
+  }, { timeout: BOOT_MS })
   after(async () => { if (worker) await worker.dispose() })
 
-  it('builds and boots at all', async () => {
+  wit('builds and boots at all', async () => {
     // Reaching this assertion is most of the value: it means the bundle
     // resolved every import, workerd accepted the module's exports, and
     // the entry really is modules-format with a default handler.
@@ -126,7 +161,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
     assert.strictEqual(body.version, require('../package.json').version)
   })
 
-  it('answers HEAD on the read-only endpoints', async () => {
+  wit('answers HEAD on the read-only endpoints', async () => {
     // Worth pinning in workerd too: whether a HEAD reaches the handler at
     // all is the runtime's business, not the handler's.
     for (const path of ['/health', '/.well-known/mcp']) {
@@ -135,7 +170,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
     }
   })
 
-  it('serves discovery with its limits', async () => {
+  wit('serves discovery with its limits', async () => {
     const body = await (await get('/.well-known/mcp')).json()
     assert.strictEqual(body.transport, 'streamable-http')
     assert.strictEqual(body.endpoint, '/mcp')
@@ -148,7 +183,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
     assert.strictEqual(body.limits.rate_period_seconds, LIMITER.period)
   })
 
-  it('initialize and tools/list answer', async () => {
+  wit('initialize and tools/list answer', async () => {
     const init = await rpc('initialize', {})
     assert.strictEqual(init.result.serverInfo.name, 'tabnas')
     const list = await rpc('tools/list')
@@ -158,7 +193,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
         'list_plugins', 'parse', 'test_grammar', 'validate_grammar'])
   })
 
-  it('every resource reads back byte-identical to the committed data/',
+  wit('every resource reads back byte-identical to the committed data/',
     async () => {
       // The whole point of the embedded bundle. Under Node this passed
       // by reading the same files off disk that it compared against;
@@ -172,7 +207,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
       }
     })
 
-  it('hosted and local answer the same bytes for the same request',
+  wit('hosted and local answer the same bytes for the same request',
     async () => {
       // The golden contract, extended across runtimes: same core, same
       // serializer, therefore the same string — not merely the same
@@ -183,7 +218,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
       assert.strictEqual(res.result.content[0].text, callTool('parse', args))
     })
 
-  it('refuses a grammar carrying a ref (ADR-10), in the real runtime',
+  wit('refuses a grammar carrying a ref (ADR-10), in the real runtime',
     async () => {
       // Pinned here and not only in Node: this is the assertion that a
       // hosted parser never becomes a hosted code executor, so it is
@@ -198,7 +233,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
         'expected a ref refusal, got ' + JSON.stringify(out.errors))
     })
 
-  it('enforces the body cap with a structured diagnostic', async () => {
+  wit('enforces the body cap with a structured diagnostic', async () => {
     const { MAX_BODY_BYTES } = require('../dist/budget')
     const res = await post('x'.repeat(MAX_BODY_BYTES + 1))
     assert.strictEqual(res.status, 413)
@@ -207,12 +242,12 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
     assert.strictEqual(body.ceiling, MAX_BODY_BYTES)
   })
 
-  it('refuses batched requests', async () => {
+  wit('refuses batched requests', async () => {
     const res = await post([{ jsonrpc: '2.0', id: 1, method: 'tools/list' }])
     assert.strictEqual(res.status, 400)
   })
 
-  it('the rate limiter is bound, and enforces at the configured ceiling',
+  wit('the rate limiter is bound, and enforces at the configured ceiling',
     async () => {
       // The one assertion that cannot be made anywhere else: a fake
       // limiter in a Node test proves the branch, not that wrangler.json
@@ -246,7 +281,7 @@ describe('hosted worker in workerd', { timeout: BOOT_MS }, () => {
         'the address is derived per run')
     })
 
-  it('buckets per IP rather than globally', async () => {
+  wit('buckets per IP rather than globally', async () => {
     // A global counter would look identical until the first two clients
     // arrive, then take the service down for everyone at once.
     const res = await postAs(IP_OTHER,
