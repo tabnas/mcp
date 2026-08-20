@@ -11,6 +11,18 @@ plugin surface are covered in
 not a parity record. A reader asking "will these two engines agree on my
 input?" should be able to answer it from this page alone.
 
+**That last sentence has been false at least twice, in the same way.**
+`go/doc/differences.md` has a section headed *"Behavioral Differences —
+These affect parse output for the same input"*, which is this file's own
+definition of a divergence, and things that belonged here were filed
+there instead: the rule-iteration budget (repaired, P7) and the `\s` /
+`(?i)` regex non-equivalences (permanent, P8, and now recorded below).
+Both were accurately DESCRIBED — and neither was pinned, because that
+file is prose and this one is backed by tests in both ports. When adding
+to either, the test is not "is this about the Go port?" but "can the two
+engines produce a different result for the same input?" If yes, it
+belongs here, whatever else is true about it.
+
 ## Why this matters more here than elsewhere
 
 This engine is the root of a dependency graph. A divergence here reaches
@@ -62,13 +74,20 @@ forms. Three of those were broken in Go until 0.8.4 and are now pinned.
 
 Error columns count UTF-16 units in TypeScript (an astral character is 2)
 and runes in Go (any character is 1). Forced by the scan unit — TS scans
-UTF-16 code units, Go scans UTF-8 bytes — and visible only in error
-positions, never in parsed values. The `pos` field of the structured
+UTF-16 code units, Go scans UTF-8 bytes. The `pos` field of the structured
 diagnostic (`schema/diagnostic.schema.json`) carries the same divergence —
-a 0-based offset in UTF-16 units (TS) versus runes (Go). The diagnostic's
-`len` deliberately counts Unicode code points OF THE TOKEN SOURCE, so the
-string-unit arithmetic never diverges; `len` can still differ where the
-two lexers cut different token SPANS (next entry).
+a 0-based offset in UTF-16 units (TS) versus runes (Go).
+
+That sentence was aspirational until recently: Go emitted a BYTE offset,
+so `pos` diverged for every character above U+007F rather than only above
+the BMP. Both this file and the schema described runes, which told a
+BMP-only consumer that `pos` was as safe as `col`. Repaired at the
+marshal boundary — where `len` had always converted for the same reason —
+so the description above is now what the code does. Audit item P5.
+
+The diagnostic's `len` deliberately counts Unicode code points OF THE
+TOKEN SOURCE, so the string-unit arithmetic never diverges; `len` can
+still differ where the two lexers cut different token SPANS (next entry).
 
 The same scan unit shows in the error token synthesized for an UNCLAIMED
 astral character (one no matcher can produce): both ports name it `#BD`
@@ -77,29 +96,242 @@ surrogate) and one rune in Go (the whole character). Pinned with opposite
 assertions by `ts/test/diagnostic.test.js` ('unclaimed-char-token') and
 `go/diagnostic_test.go` (`TestDiagnosticUnclaimedCharToken`).
 
-### Bad-token spans for invalid string escapes
+### Token offsets reach parsed values, not only diagnostics
 
-The two lexers cut a DIFFERENT bad token for the same invalid escape:
-TypeScript's string matcher reports the offending escape sequence itself,
-Go's reports the string from its opening quote up to the escape. Same
-error `code` — the contract holds — but the token source, and therefore
-the diagnostic's `len`/`pos`/`col`, diverge even for pure-ASCII input:
+**This entry exists because the one above used to end "and visible only
+in error positions, never in parsed values". That was false.** `Token.SI`
+is part of the plugin API, and a plugin that records it lands the scan
+unit directly in its output.
+
+Measured through `@tabnas/c`, whose CST carries a `span` built from
+`tkn.SI`, on the input `["\u{1F600}" 1]`:
+
+| token | TypeScript | Go |
+| --- | --- | --- |
+| `PUNC_LBRACKET` | 0→1 | 0→1 |
+| `LIT_STRING` | 1→**5** | 1→**7** |
+| `LIT_INT` | **6**→7 | **8**→9 |
+| `PUNC_RBRACKET` | 7→8 | 9→10 |
+
+TypeScript counts the astral character as 2 UTF-16 units; Go counts its 4
+UTF-8 bytes. **Go's `Token.SI` is a byte offset — not a rune offset**,
+which is what the column entry above describes for error positions after
+conversion. Every token after a non-ASCII one is displaced.
+
+Found by `tasks/ax-parity-probe` in tabnas/admin, once `@tabnas/c` gained
+the `pluginKind: "grammar"` descriptor field that had been keeping it out
+of the probe: 5 disagreements of 23 inputs, every one an input containing
+a non-ASCII character, and `@tabnas/expr` is exposed the same way.
+
+Not repairable in a plugin: converting offsets there would need the
+source and would still leave `tkn.SI` itself divergent for anything else
+reading it. The repair is the engine's scan unit, which is the same
+change the column entry above defers. Recorded rather than fixed, and the
+scope sentence corrected so the next reader is not told this cannot reach
+a parsed value.
+
+## Repaired, and what replaced them
+
+An entry that leaves this file should leave a forwarding address: a
+reader who remembers one and cannot find it needs to know whether it was
+fixed or quietly dropped.
+
+- **Bad-token spans and codes for invalid string escapes.** Carried a
+  table of `len`/`pos`/`col` differences and, at one point, the claim
+  that the error `code` always agreed. Both halves are repaired: the
+  TypeScript escape decode now requires the full fixed-width hex run
+  (it accepted any prefix, so `"\x4Z"` parsed as U+0004 with the `Z`
+  discarded), and the Go string matcher now positions its errors on the
+  offending construct rather than the opening quote. Swept 32 inputs for
+  the first and 19 for the second: 0 diverge.
+
+  Kept as PARITY tests rather than deleted —
+  `TestEscapeDecodeIsStrict` and `TestStringErrorsPointAtTheConstruct`
+  in both ports. Both defects are easy to reintroduce and silent when
+  they are: a plain `parseInt` is the obvious way to write the decode,
+  and dropping the point-move leaves the codes right and only the
+  positions wrong.
+
+### Rule-iteration budget: a fractional `rule.maxmul`
+
+The runaway guard's multiplier is a `number` in TypeScript and a `*int` in
+Go, so a value between 0 and 1 shrinks the budget in one port and cannot
+be written in the other.
+
+| options | TypeScript | Go |
+|---|---|---|
+| `rule.maxmul: 0.01`, 61-element array | `ERROR unexpected` | not expressible; through an options map it truncates to `0`, which coerces to the default `3`, and parses |
+
+That Go column was not true when first written: `MapToOptions` handled
+`rule.start`, `finish`, `include` and `exclude` and dropped `maxmul`
+entirely, so a shared options blob set the multiplier in TypeScript and
+left Go on its default with nothing to notice. Plumbed, and pinned by
+`go/rule_budget_test.go` `TestMaxMulSurvivesTheOptionsMap`. `maxmul` is
+the only numeric option that path carries; the others (`rewind.history`,
+the `error.recover` caps, `parse.budget.checkEveryN`) are still dropped,
+which is an API gap rather than a divergence and is noted in
+[`go/doc/differences.md`](go/doc/differences.md).
+
+Everything else about this guard is aligned, and was not. Three separate
+ways it produced a different result for the same input, all repaired:
+TypeScript honoured a zero or negative multiplier literally; Go wrapped
+the product and met its own floor of 100, so a LARGER multiplier was a
+STRICTER guard; and the two ports measured source length in different
+units — UTF-16 code units in TypeScript, bytes in Go — so any source
+above U+007F got a different budget in each. See "Rule-Iteration Budget"
+in [`go/doc/differences.md`](go/doc/differences.md) and audit item P7.
+
+Not repaired here, because the fix is to the option's TYPE. Narrowing
+TypeScript's `maxmul` to an integer would break callers for a setting
+nobody tunes fractionally, and widening Go's would put a float in a
+loop counter. The floor of 100 bounds the damage: a fractional multiplier
+cannot make a SHORT parse fail in either port.
+
+Pinned by `ts/test/rule-budget.test.js` ('a fractional maxmul is
+expressible here and not in Go') alongside the aligned cases, so the two
+are read together.
+
+### Regex dialect in serialized terminals
+
+A grammar spec can carry a match token as a serialized regex
+(`"#WS": "@/^\\s+/"`). Each runtime compiles it with its own engine — JS
+`RegExp` in TypeScript, RE2 in Go — and the two dialects disagree on two
+constructs. **It diverges in both directions.**
+
+| pattern | input | TypeScript | Go |
+|---|---|---|---|
+| `@/^\s+/` | U+00A0 NBSP | accepted | **rejected** |
+| `@/^\s+/` | U+2028, U+2000, U+3000, U+FEFF | accepted | **rejected** |
+| `@/^\s+/` | U+0020, U+0009 | accepted | accepted |
+| `@/^k/i` | `k`, `K` | accepted | accepted |
+| `@/^k/i` | U+212A KELVIN SIGN | **rejected** | accepted |
+
+JS `\s` is Unicode-aware; RE2's is the Perl class `[\t\n\f\r ]`. JS `/i`
+without `u` does not fold U+212A to `k`; RE2 case-folds by Unicode rules
+and does.
+
+**And two constructs that do not diverge in the result but in whether the
+grammar loads at all**, which for a grammar author is worse:
+
+| pattern | TypeScript | Go |
+|---|---|---|
+| `@/^(?=x)x/` (lookahead) | installs, matches `x` | **install error** |
+| `@/^(a)\1/` (backreference) | installs, matches `aa` | **install error** |
+
+RE2 implements neither, by design — both need backtracking. `go/utility.go`
+refuses them at compile time and `Grammar()` reports it, which is the right
+failure mode, but it means a spec written and tested against TypeScript can
+be unloadable in Go. The `v` flag is the same story. Treat "compiles in JS"
+as no evidence that a serialized terminal is portable.
+
+**This is recorded rather than fixed, and the reason is worth stating
+plainly, because the two halves are not equally hard.**
+
+`\s` is mechanically repairable: a compile-time rewrite could expand it to
+the explicit JS class before handing the pattern to RE2. That is not free —
+it means this engine ships a regex-dialect translation layer, which has to
+parse enough of the pattern to know a `\s` inside a character class from a
+`\\s` that is a literal backslash, and it then owns that translation for
+every downstream grammar in both runtimes. `(?i)` is not repairable the same
+way: RE2 has no ASCII-only case-folding flag, so matching JS would mean
+rewriting the pattern into explicit alternations.
+
+Adding the layer for one of the two is a decision for the maintainer, not a
+mechanical fix, so it is written down here with the cost attached instead of
+being taken unilaterally.
+
+**The workaround, measured rather than assumed — and spelled the JS way.**
+An explicit class in the serialized terminal makes the two agree exactly:
+
+```
+@/^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+/
+```
+
+**The `\uXXXX` spelling is load-bearing.** A serialized pattern is JS source:
+TypeScript hands it to `new RegExp`, and Go lowers it to RE2. Writing the
+class the RE2 way (`\x{00a0}`) makes it a *SyntaxError in TypeScript* — a
+"portable" workaround that only works in one runtime, which is the very
+defect this entry records. The first draft of this entry had it that way
+round; it was caught in review, which is why the workaround is now pinned in
+both runtimes rather than only written down.
+
+With the pattern above both runtimes accept U+0020, U+0009, U+00A0, U+2028,
+U+2000, U+3000 and U+FEFF and both reject `A` — the verdicts TS gives for
+`\s`. Prefer it over `\s` in any serialized terminal a Go runtime will
+compile.
+
+Pinned by `go/divergence_test.go` `TestDivergenceRegexDialect` and the
+matching case in `ts/test/divergence.test.js`, which assert **opposite**
+results on purpose. Both drive a real `GrammarSpec` through
+`grammar()` / `Grammar()` and parse: the gap was previously known only at
+the regex-engine layer, so "a shared grammar that depends on either will
+differ" was a prediction until this was wired.
+
+### An explicitly empty option cannot be expressed in Go
+
+**Deferred, not deliberate** — this is a defect awaiting a breaking
+change, recorded here so consumers are not told it does not exist.
+
+`String.Chars`, `String.MultiChars`, `String.EscapeChar`, `Space.Chars`,
+`Line.Chars` and `Line.RowChars` are plain `string` in the Go options, so
+`""` is their zero value and an explicitly empty value is
+indistinguishable from an unset one. Each config branch tests `!= ""` and
+restores the default when empty.
+
+TypeScript distinguishes `''` from `undefined` and honours it; Go cannot,
+so the defaults stay in force.
+
+Six fields, not four: `Line.RowChars` and `String.EscapeChar` were missed
+on the first pass, and they are not cosmetic — `rowChars: ''` changes
+reported POSITIONS and `escapeChar: ''` changes string-token CONTENT.
+
+The consequence is a **different result for the same input** whenever a
+plugin configures its lexer that way. `@tabnas/css` declared
+`string: { chars: '' }` in both ports:
 
 | input | TypeScript | Go |
-|---|---|---|
-| `"\uZZZZ"` | code `invalid_unicode`, token src `\uZZZZ`, pos 1, col 2, len 6 | code `invalid_unicode`, token src `"\uZZZZ`, pos 0, col 1, len 7 |
+| --- | --- | --- |
+| `a"b` | `jsonic/unexpected` | `jsonic/unterminated_string` |
 
-This is span metadata on an already-agreed failure, not a disagreement
-about the input's value: both ports reject the document with the same
-code, and no parsed value exists to differ. Aligning the spans would mean
-rewriting one lexer's error recovery to match the other's internal
-matcher structure, for display-only gain. Consumers should treat
-`len`/`pos`/`col` on bad-token errors as advisory and anchor on `code`
-(and `row`, which agrees).
+The repair is `Chars *string`, matching `Lex`, `AllowUnknown` and
+`EscapeStrict`, which are pointers for exactly this reason. It is a
+breaking change across a published module, so it is outstanding rather
+than done — and the blocking constraint is specific enough to write down.
 
-Pinned by `ts/test/divergence.test.js` and `go/divergence_test.go`
-(`TestDivergenceBadEscapeSpanIncludesQuote`), which assert **opposite**
-spans on purpose, so changing either side fails loudly.
+The adoption cost, counted across the fleet excluding tests:
+
+| repo | affected call sites |
+| --- | --- |
+| `parser` | its own config branches |
+| `jsonic` | 3 |
+| `ini` | 3 |
+| `json`, `chess`, `zon` | 2 each |
+| `css`, `csv`, `yaml` | 1 each |
+
+**Consumers are not broken by the merge.** They pin the engine — `ini`,
+`zon`, `csv` and `yaml` all require `parser/go v0.8.10` — so a type change
+on `main` reaches them only when someone bumps that pin. The fifteen call
+sites are an ADOPTION cost paid at upgrade, not a coordination cost paid
+at merge.
+
+That makes this a **release-policy decision** rather than a scheduling
+puzzle: whether to spend a breaking bump on it, and when. Not a call to
+make as a side effect of a parity sweep, which is why it is recorded here
+instead of done.
+
+A non-breaking half-measure exists and is deliberately not taken: an
+additive `CharsSet *string` preferred when non-nil would give Go a way to
+SAY "no quote characters" without changing any existing caller. It closes
+the capability gap and leaves the divergence — `Chars: ""` would still
+mean two different things in the two ports — so it trades a recorded
+defect for an unrecorded one plus a second way to spell the same option. `TestEmptyCharsMeansUnset` pins the current
+behaviour and **fails when the repair lands** — the signal to delete this
+entry along with it.
+
+Sibling ports are not all exposed: of the four call sites in the fleet
+that set an empty value, only css's was live. `csv` sets `Lex: false`
+alongside; `json` and `chess` set `MultiChars: ""` where the backtick was
+never a quote character to begin with.
 
 ## Not divergences
 
