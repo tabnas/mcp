@@ -55,6 +55,26 @@ tightening one without the other would make the pair incoherent.
   service one. (One such rule exists: BIC is disabled for this hostname,
   because programmatic clients are the entire legitimate population here.)
 
+## After a release: the surfaces that do not update themselves
+
+Pushing a `ts/v*` tag publishes to npm and nothing else. Seven places record
+this package's version; that tag updates one.
+
+```bash
+node ts/tools/check-published.js
+```
+
+Reports npm, the MCP registry entry, the deployed Worker and the skills pin
+against this checkout, and names the command that fixes each. Needs the
+network, so it is not part of `npm test`.
+
+`ci/release.yml` (staged for promotion, ADR-8) automates the registry half —
+it authenticates with GitHub OIDC and needs no new secret. The Worker deploy
+and the skills-pin push are deliberately NOT automated there: one would mean
+giving the release workflow a Cloudflare token, the other write access to
+another repository, and both are decisions for a maintainer rather than
+things a workflow should quietly acquire.
+
 ## How to re-measure
 
 ```bash

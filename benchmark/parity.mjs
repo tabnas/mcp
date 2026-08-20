@@ -111,6 +111,37 @@ function percentile(sorted, p) {
 console.log(`AX parity — local core vs ${ENDPOINT}`)
 
 let failures = 0
+
+// FIRST, and separately from the tool comparison: is the endpoint even
+// running this code?
+//
+// On 2026-08-20 it was not — mcp.tabnas.dev served 0.1.7 while npm and the
+// registry said 0.1.9, because two releases went out without a redeploy.
+// This harness caught it, but only by LUCK: the bundled plugin data had
+// also changed, so list_plugins diverged. Had the drift been code-only,
+// every tool would have compared equal against a stale deploy and this
+// would have reported success.
+//
+// A parity run that cannot tell you WHICH BUILD it just agreed with is not
+// worth much, so the version is asserted rather than inferred.
+try {
+  const health = await (await fetch(ENDPOINT.replace(/\/mcp$/, '/health'))).json()
+  const local = JSON.parse(
+    readFileSync(join(REPO, 'ts', 'package.json'), 'utf8')).version
+  if (health.version === local) {
+    console.log(`  deployed version ${health.version} — matches this checkout`)
+  } else {
+    console.error(`  VERSION MISMATCH — endpoint serves ${health.version}, ` +
+      `this checkout is ${local}`)
+    console.error('    The tool comparison below is against a DIFFERENT ' +
+      'build; identical results do not mean what they usually mean.')
+    console.error('    Redeploy with `npm run worker-deploy`, then re-run.')
+    failures++
+  }
+} catch (e) {
+  console.error(`  could not read the endpoint's version — ${e.message}`)
+  failures++
+}
 const timings = []
 
 for (const [name, args] of CASES) {

@@ -1,0 +1,103 @@
+# Staged per ADR-8: automation cannot push .github/workflows/*, so this file
+# is written to <repo>/ci/release.yml for a maintainer to promote via
+# admin/rollout/apply-ci-folders.sh.
+#
+# Publishes @tabnas/mcp to npm on a `ts/v*` tag push, via GitHub OIDC Trusted
+# Publishing (no token). The build runs against the ALREADY-PUBLISHED
+# dependency versions (npm i resolves them), so a failing build never
+# publishes. Byte-identical to the release.yml in parser, json, jsonic and
+# expr from `name:` onward.
+#
+# This repo has no go/, so there is no Go job. The Cloudflare worker is a
+# separate delivery channel (wrangler, see worker-deploy) and is still NOT
+# part of the npm release — deploying it from CI would mean giving this
+# workflow a Cloudflare token, which is a maintainer's decision. The MCP
+# registry IS published here, because it authenticates with GitHub OIDC and
+# needs no new secret.
+#
+# Tests are not re-run here — the orchestrator (admin/publish.sh) verifies
+# build+test locally against published deps and requires a green main CI
+# before tagging.
+name: release
+
+on:
+  push:
+    tags:
+      - 'ts/v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Build and publish to npm (OIDC trusted publishing)
+        working-directory: ts
+        run: |
+          npm install -g npm@latest
+          npm i
+          npm run build --if-present
+          npm publish --access public
+
+  # The npm publish above is the only thing a `ts/v*` tag updated. Everything
+  # else that records this version was a separate manual step, and on
+  # 2026-08-20 two of them silently fell behind: mcp.tabnas.dev served 0.1.7
+  # while npm and the registry said 0.1.9, because two releases went out
+  # without a redeploy.
+  #
+  # This job closes the one that can be closed without handing CI a new
+  # credential: the MCP registry accepts GitHub OIDC, so no secret is
+  # needed. It runs only after the npm publish succeeds, because the
+  # registry verifies the npm package carries a matching `mcpName` — a
+  # registry entry pointing at a version npm does not serve is worse than a
+  # stale one.
+  publish-registry:
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install mcp-publisher
+        run: |
+          VERSION=1.8.1
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v${VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin mcp-publisher
+          mcp-publisher --version
+      - name: Wait for npm to serve the new version
+        run: |
+          # The registry reads the npm package to verify mcpName. Publishing
+          # before the registry can see the version fails with a confusing
+          # "missing mcpName" rather than "not published yet".
+          V=$(node -p "require('./ts/package.json').version")
+          for i in $(seq 1 20); do
+            [ "$(npm view @tabnas/mcp version 2>/dev/null)" = "$V" ] && exit 0
+            sleep 15
+          done
+          echo "npm did not serve $V within 5 minutes" >&2
+          exit 1
+      - name: Publish to the MCP registry (GitHub OIDC)
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish
+
+  # NOT automated here, deliberately, and detected instead:
+  #
+  #   the deployed Worker   needs a Cloudflare API token as a repo secret
+  #   the skills/mcp.json pin  needs write access to another repository
+  #
+  # Both are credential decisions for a maintainer rather than something a
+  # release workflow should quietly acquire. Until then
+  # `node ts/tools/check-published.js` reports every surface that disagrees
+  # with the checkout, and benchmark/parity.mjs refuses to compare tools
+  # against an endpoint running a different build.

@@ -36,6 +36,7 @@
     "repo-publish-quick": "npm run build && npm run test && npm run repo-tag",
     "benchmark": "node ../benchmark/run.mjs",
     "parity": "npm run build && node ../benchmark/parity.mjs",
+    "check-published": "node tools/check-published.js",
     "worker-dev": "npm run build && wrangler dev --config ../wrangler.json",
     "worker-deploy": "npm run build && wrangler deploy --config ../wrangler.json"
   },
