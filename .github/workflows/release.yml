@@ -141,15 +141,28 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --config ../wrangler.json
-      - name: Verify the endpoint serves this version
+      - name: Verify the endpoint serves this version, everywhere
         run: |
+          # Requires the new version CONSECUTIVELY, not once. A Worker
+          # rollout is not atomic across Cloudflare's edge: on 0.1.11 this
+          # step saw the new version, passed, and the parity step
+          # immediately after hit a colo still serving the old one. A gate
+          # that flakes on a normal rollout is worse than no gate, because
+          # it trains people to re-run rather than read it.
           V=$(node -p "require('./ts/package.json').version")
-          for i in $(seq 1 12); do
+          STREAK=0
+          for i in $(seq 1 30); do
             LIVE=$(curl -fsS https://mcp.tabnas.dev/health | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" 2>/dev/null || true)
-            [ "$LIVE" = "$V" ] && exit 0
-            sleep 10
+            if [ "$LIVE" = "$V" ]; then
+              STREAK=$((STREAK + 1))
+              [ "$STREAK" -ge 5 ] && { echo "settled on $V"; exit 0; }
+            else
+              [ "$STREAK" -gt 0 ] && echo "saw $LIVE after $STREAK match(es) — rollout still in progress"
+              STREAK=0
+            fi
+            sleep 5
           done
-          echo "endpoint still serving $LIVE, expected $V" >&2
+          echo "endpoint did not settle on $V (last saw $LIVE)" >&2
           exit 1
       - name: Byte-parity, hosted vs local
         # The assertion the whole service rests on. A deploy that lands but
