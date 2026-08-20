@@ -69,7 +69,8 @@
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/c",
-      "versionSource": "ts/package.json"
+      "versionSource": "ts/package.json",
+      "pluginKind": "grammar"
     },
     {
       "$schema": "https://tabnas.dev/schema/plugin.schema.json",
@@ -96,7 +97,8 @@
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/chess",
-      "versionSource": "ts/package.json"
+      "versionSource": "ts/package.json",
+      "pluginKind": "grammar"
     },
     {
       "$schema": "https://tabnas.dev/schema/plugin.schema.json",
@@ -232,7 +234,8 @@
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/expr",
-      "versionSource": "ts/package.json"
+      "versionSource": "ts/package.json",
+      "pluginKind": "grammar"
     },
     {
       "$schema": "https://tabnas.dev/schema/plugin.schema.json",
