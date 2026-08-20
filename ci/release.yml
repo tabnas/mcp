@@ -9,11 +9,11 @@
 # expr from `name:` onward.
 #
 # This repo has no go/, so there is no Go job. The Cloudflare worker is a
-# separate delivery channel (wrangler, see worker-deploy) and is still NOT
-# part of the npm release — deploying it from CI would mean giving this
-# workflow a Cloudflare token, which is a maintainer's decision. The MCP
-# registry IS published here, because it authenticates with GitHub OIDC and
-# needs no new secret.
+# separate delivery CHANNEL, but it is now part of the release: a tag push
+# publishes to npm, publishes the MCP registry entry, and deploys the Worker,
+# so the three cannot drift apart the way they did on 2026-08-20. The
+# registry authenticates with GitHub OIDC; the Worker needs
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets.
 #
 # Tests are not re-run here — the orchestrator (admin/publish.sh) verifies
 # build+test locally against published deps and requires a green main CI
@@ -91,13 +91,53 @@ jobs:
           mcp-publisher login github-oidc
           mcp-publisher publish
 
-  # NOT automated here, deliberately, and detected instead:
+  # The hosted endpoint. Before this job, nothing redeployed it on release:
+  # mcp.tabnas.dev served 0.1.7 for hours while npm said 0.1.9, and the only
+  # thing that noticed was running parity.mjs by hand.
   #
-  #   the deployed Worker   needs a Cloudflare API token as a repo secret
-  #   the skills/mcp.json pin  needs write access to another repository
-  #
-  # Both are credential decisions for a maintainer rather than something a
-  # release workflow should quietly acquire. Until then
-  # `node ts/tools/check-published.js` reports every surface that disagrees
-  # with the checkout, and benchmark/parity.mjs refuses to compare tools
-  # against an endpoint running a different build.
+  # Runs after publish-npm so a failed publish never reaches production, and
+  # verifies rather than assumes: the deploy is only successful if the live
+  # endpoint then reports the version this tag published AND answers
+  # byte-identically to local core for every tool.
+  deploy-worker:
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Build
+        working-directory: ts
+        # The Worker bundles src/data-bundle.ts and src/grammar-validator.js,
+        # both generated and gitignored, so a deploy without a build ships
+        # nothing at all.
+        run: npm i && npm run build
+      - name: Deploy
+        working-directory: ts
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --config ../wrangler.json
+      - name: Verify the endpoint serves this version
+        run: |
+          V=$(node -p "require('./ts/package.json').version")
+          for i in $(seq 1 12); do
+            LIVE=$(curl -fsS https://mcp.tabnas.dev/health | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" 2>/dev/null || true)
+            [ "$LIVE" = "$V" ] && exit 0
+            sleep 10
+          done
+          echo "endpoint still serving $LIVE, expected $V" >&2
+          exit 1
+      - name: Byte-parity, hosted vs local
+        # The assertion the whole service rests on. A deploy that lands but
+        # answers differently is worse than one that fails.
+        run: node benchmark/parity.mjs
+
+  # STILL not automated here: the skills/mcp.json pin, which needs write
+  # access to ANOTHER repository. That is a different kind of credential from
+  # a deploy token — it lets this workflow push commits elsewhere — so it
+  # stays a maintainer step, and `node ts/tools/check-published.js` reports
+  # it alongside every other surface.

@@ -68,12 +68,18 @@ Reports npm, the MCP registry entry, the deployed Worker and the skills pin
 against this checkout, and names the command that fixes each. Needs the
 network, so it is not part of `npm test`.
 
-`ci/release.yml` (staged for promotion, ADR-8) automates the registry half —
-it authenticates with GitHub OIDC and needs no new secret. The Worker deploy
-and the skills-pin push are deliberately NOT automated there: one would mean
-giving the release workflow a Cloudflare token, the other write access to
-another repository, and both are decisions for a maintainer rather than
-things a workflow should quietly acquire.
+`ci/release.yml` (staged for promotion, ADR-8) closes most of it: a `ts/v*`
+tag now publishes to npm, publishes the MCP registry entry (GitHub OIDC, no
+secret), and deploys the Worker — then verifies the live endpoint reports
+that version and still answers byte-identically to local core.
+
+Requires two repository secrets: `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`.
+
+Still manual: the `skills/mcp.json` pin, which needs write access to another
+repository. That is a different kind of credential from a deploy token — it
+lets the workflow push commits elsewhere — so it stays a maintainer step,
+and check-published.js reports it alongside everything else.
 
 ## How to re-measure
 
