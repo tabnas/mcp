@@ -69,10 +69,18 @@ async function main() {
   try {
     const d = await get(
       'https://registry.modelcontextprotocol.io/v0/servers?search=tabnas')
-    const server = (d.servers || []).map((s) => s.server)
-      .find((s) => s && s.name === 'dev.tabnas/mcp')
-    record('MCP registry entry', server ? server.version : null,
-      server ? undefined : 'no dev.tabnas/mcp entry found')
+    // The registry keeps EVERY published version and returns them all;
+    // exactly one carries isLatest. Taking the first entry by name reported
+    // 0.1.9 as current while 0.1.11 sat beside it — this checker's own bug,
+    // and precisely the failure mode it exists to catch.
+    const entries = (d.servers || [])
+      .filter((s) => s.server && s.server.name === 'dev.tabnas/mcp')
+    const latest = entries.find((s) =>
+      s._meta?.['io.modelcontextprotocol.registry/official']?.isLatest)
+    record('MCP registry entry',
+      latest ? latest.server.version : null,
+      entries.length === 0 ? 'no dev.tabnas/mcp entry found'
+        : latest ? undefined : 'entries exist but none is marked isLatest')
   } catch (e) { record('MCP registry entry', null, e.message) }
 
   // The hosted endpoint. Nothing redeploys it on release; it is the surface
