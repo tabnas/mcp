@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.tabnas/mcp",
+  "name": "dev.tabnas/mcp",
   "title": "tabnas",
   "description": "Seven tools over the tabnas parsing engine: parse, validate, diagnose, fixtures, compare.",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "websiteUrl": "https://tabnas.dev/mcp",
   "repository": {
     "url": "https://github.com/tabnas/mcp",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@tabnas/mcp",
-      "version": "0.1.8",
+      "version": "0.1.9",
       "transport": {
         "type": "stdio"
       },
