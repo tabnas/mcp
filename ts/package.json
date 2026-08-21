@@ -67,5 +67,12 @@
     "type": "git",
     "url": "git://github.com/tabnas/mcp.git",
     "directory": "ts"
+  },
+  "tabnas": {
+    "release": {
+      "generate": [
+        "gen-data"
+      ]
+    }
   }
 }
