@@ -294,6 +294,82 @@ describe('validate_grammar', () => {
 })
 
 
+describe('validate_grammar: rule references resolve', () => {
+  // The gap this closes: `p` and `r` name a rule, and naming one that does
+  // not exist passed every layer. The schema sees a string, the security
+  // scan sees no FuncRef, and the engine load succeeds because rules
+  // resolve at PARSE time. validate_grammar answered ok:true about a
+  // grammar that fails on first use with `unknown_rule`.
+  //
+  // That matters because of who asks. An agent asks "is this valid", is
+  // told yes, and repeats it to a user; the defect resurfaces later as a
+  // parse failure that looks unrelated to the edit that caused it.
+
+  it('rejects a push to a rule nothing defines', () => {
+    const result = validateGrammar({
+      grammar: { rule: { val: { open: [{ s: [], p: 'does_not_exist' }] } } },
+    })
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.errors[0].path, '$.rule.val.open[0].p')
+    assert.match(result.errors[0].message, /unknown rule: does_not_exist/)
+  })
+
+  it('rejects a replace to a rule nothing defines', () => {
+    const result = validateGrammar({
+      grammar: { rule: { val: { close: [{ s: [], r: 'ghost' }] } } },
+    })
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.errors[0].path, '$.rule.val.close[0].r')
+    assert.match(result.errors[0].message, /unknown rule: ghost/)
+  })
+
+  it('accepts a reference the same grammar defines', () => {
+    const result = validateGrammar({
+      grammar: {
+        rule: { val: { open: [{ s: [], p: 'other' }] }, other: { open: [] } },
+      },
+    })
+    assert.strictEqual(result.ok, true, JSON.stringify(result.errors))
+  })
+
+  // A FuncRef computes the rule name during the parse, so no static check
+  // can know it. Skipped here rather than guessed at — and still covered
+  // by the security scan for whether the ref is a legal builtin.
+  it('does not treat a FuncRef as a dangling rule name', () => {
+    const result = validateGrammar({
+      grammar: { rule: { val: { open: [{ s: [], p: '@rule$' }] } } },
+    })
+    const dangling = (result.errors ?? [])
+      .filter((e) => /unknown rule:/.test(e.message))
+    assert.strictEqual(dangling.length, 0, JSON.stringify(result.errors))
+  })
+
+  // The known set is read from the LOADED INSTANCE, so a null entry that
+  // removes a rule makes references to it dangle — which is correct, and
+  // is the reason not to maintain a builtin list here.
+  it('counts a removed rule as undefined', () => {
+    const result = validateGrammar({
+      grammar: {
+        rule: { val: { open: [{ s: [], p: 'gone' }] }, gone: null },
+      },
+    })
+    assert.strictEqual(result.ok, false)
+    assert.match(result.errors[0].message, /unknown rule: gone/)
+  })
+
+  // The error names what IS available, because an agent that just learned
+  // its reference is wrong needs the candidates, not just the rejection.
+  it('lists the rules that do exist', () => {
+    const result = validateGrammar({
+      grammar: {
+        rule: { val: { open: [{ s: [], p: 'nope' }] }, other: { open: [] } },
+      },
+    })
+    assert.match(result.errors[0].message, /name one of: other, val/)
+  })
+})
+
+
 describe('firewall: prototype pollution (ADR-10 ship-blocker)', () => {
   // The engine's grammar install deep-merges the spec with no __proto__
   // guard, so a poison key anywhere in a grammar or in request options

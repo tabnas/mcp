@@ -768,7 +768,12 @@ export function compareGrammars(req: CompareRequest): CompareResult {
   // code, not a reason to relax.
   const errors: ValidationIssue[] = []
   for (const [label, g] of [['a', req.a], ['b', req.b]] as const) {
-    const res = validateGrammarInternal(g)
+    // checkRuleRefs: false — a dangling rule reference is what this tool
+    // REPORTS, not a reason to refuse the comparison. Removing a rule that
+    // other alternatives still push is a real regression, and the caller
+    // asked us to find it; the rule-set comparison below names it. Every
+    // security layer still runs, unchanged.
+    const res = validateGrammarInternal(g, { checkRuleRefs: false })
     for (const e of res.errors) {
       errors.push({ path: e.path.replace(/^\$/, `$.${label}`), message: e.message })
     }

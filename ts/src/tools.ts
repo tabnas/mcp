@@ -77,8 +77,11 @@ export const TOOLS = [
   {
     name: 'validate_grammar',
     description: 'Validate a serialized GrammarSpec. Structural ' +
-      'validation against the bundled grammar schema plus an engine ' +
-      'load in a fresh instance. Returns {ok:true, v} (v = declared ' +
+      'validation against the bundled grammar schema, an engine ' +
+      'load in a fresh instance, and a check that every rule reference ' +
+      '(`p`, `r`) names a rule the grammar actually defines — a ' +
+      'dangling reference loads cleanly and then fails at parse time ' +
+      'with `unknown_rule`. Returns {ok:true, v} (v = declared ' +
       'builtin config-schema version, absent means 1) or {ok:false, ' +
       'errors:[{path,message}]}. Security: a grammar carrying a `ref` ' +
       'key, or any function reference that is not a $-suffixed engine ' +

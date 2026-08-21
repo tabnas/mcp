@@ -356,6 +356,80 @@ function scanGrammarRefs(gs: Record<string, unknown>): ValidationIssue[] {
 }
 
 
+
+// Rule REFERENCES, checked against the rules the grammar actually
+// produces. `p` (push child rule) and `r` (replace with sibling rule)
+// name a rule; naming one that does not exist is accepted by every layer
+// above -- the schema sees a string, the security scan sees no FuncRef,
+// and the engine load succeeds because rules are resolved at PARSE time,
+// not at load time. The grammar then fails on first use with the
+// engine's own `unknown_rule`.
+//
+// That gap is worth closing precisely because of who validate_grammar is
+// for. An agent asks "is this grammar valid?", is told yes, and reports
+// that to a user; the defect surfaces later as a parse failure that
+// looks unrelated to the edit that caused it. A validator that answers
+// "yes" about a grammar that cannot parse anything is worse than no
+// validator, because it is trusted.
+//
+// The known set is READ FROM THE LOADED INSTANCE, never a hardcoded list
+// of builtins. The bare engine defines no rules at all, `null` entries
+// REMOVE rules, and both facts fall out of asking the instance instead
+// of maintaining a list here that would drift from the engine.
+//
+// FuncRef values are skipped deliberately: `p: '@something$'` computes
+// the rule name during the parse, so no static check can know it. Those
+// are already covered by the security scan for whether the ref itself is
+// a legal builtin.
+function scanRuleRefs(
+  gs: Record<string, unknown>, known: Set<string>,
+): ValidationIssue[] {
+  const out: ValidationIssue[] = []
+
+  if (null == gs.rule || 'object' !== typeof gs.rule) {
+    return out
+  }
+
+  const rules = gs.rule as Record<string, unknown>
+  for (const rulename of Object.keys(rules)) {
+    const rulespec = rules[rulename]
+    if (null == rulespec || 'object' !== typeof rulespec) {
+      continue
+    }
+    for (const state of ['open', 'close']) {
+      const alts = altsOf((rulespec as Record<string, unknown>)[state])
+      alts.forEach((alt, i) => {
+        if (null == alt || 'object' !== typeof alt || Array.isArray(alt)) {
+          return
+        }
+        const rec = alt as Record<string, unknown>
+        for (const k of ['p', 'r']) {
+          const v = rec[k]
+          if ('string' !== typeof v || 0 === v.length) {
+            continue
+          }
+          if (v.startsWith('@')) {
+            continue                 // FuncRef: resolved during the parse
+          }
+          if (!known.has(v)) {
+            out.push({
+              path: `$.rule.${rulename}.${state}[${i}].${k}`,
+              message: `unknown rule: ${v}. No rule named ${v} is ` +
+                'defined by this grammar, so a parse reaching this ' +
+                'alternative fails with `unknown_rule`. Define it under ' +
+                '$.rule, or name one of: ' +
+                ([...known].sort().join(', ') || '(this grammar defines none)'),
+            })
+          }
+        }
+      })
+    }
+  }
+
+  return out
+}
+
+
 // The compiled validator's call shape. The generated module has no
 // types of its own, and this is the whole of what core uses: call it,
 // then read `.errors` when it says no.
@@ -417,7 +491,22 @@ function structuralIssues(gs: Record<string, unknown>): ValidationIssue[] {
 // security scan and the structural walk both pass: those two decide the
 // grammar is DATA, and only then is it worth (and safe to reason about)
 // handing to the engine.
-export function validateGrammarInternal(grammar: unknown): {
+export function validateGrammarInternal(
+  grammar: unknown,
+  // Rule-reference checking is ON by default and off for exactly one
+  // caller. For validate_grammar and parse, a dangling `p`/`r` means the
+  // grammar cannot do its job, so it is an error. For compare_grammars,
+  // a dangling reference is the SUBJECT MATTER -- "you removed `pair` and
+  // three alternatives still push it" is precisely the regression that
+  // tool exists to surface, and refusing to analyse the grammar would
+  // withhold the finding instead of reporting it.
+  //
+  // The security layers are NOT optional and take no flag: no `ref`, no
+  // non-builtin FuncRef, no prototype-pollution keys, no oversized rule
+  // set. Those decide whether the grammar is data, and that question has
+  // the same answer for every caller.
+  opts: { checkRuleRefs?: boolean } = {},
+): {
   errors: ValidationIssue[]
   v: number
 } {
@@ -473,7 +562,17 @@ export function validateGrammarInternal(grammar: unknown): {
 
   if (0 === errors.length) {
     try {
-      new Tabnas().grammar(gs as never)
+      // The instance is kept, not discarded: its rule map is the only
+      // honest answer to "which rule names are valid here", accounting
+      // for what the grammar added and what its null entries removed.
+      const inst = new Tabnas()
+      inst.grammar(gs as never)
+      // rule() is overloaded (getter/setter/map); the no-arg form returns
+      // the map, and the cast names that rather than widening the call.
+      if (false !== opts.checkRuleRefs) {
+        const ruleMap = (inst.rule() ?? {}) as Record<string, unknown>
+        errors.push(...scanRuleRefs(gs, new Set(Object.keys(ruleMap))))
+      }
     } catch (err) {
       errors.push({
         path: '$',
