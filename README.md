@@ -6,6 +6,8 @@ an [MCP](https://modelcontextprotocol.io) server (stdio) and the unified
 never disagree. For each operation the CLI's `--json` output and the MCP
 tool result are **byte-identical**, and the test suite holds them to it.
 
+The website page for this package — per-client setup, the tool contracts, the hosted endpoint's bounds: **[tabnas.dev/mcp](https://tabnas.dev/mcp/)**.
+
 Published as `@tabnas/mcp`. This repo is TypeScript-only: it is tooling
 over the engine, not a parity package, so there is no Go port.
 
