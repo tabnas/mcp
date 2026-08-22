@@ -1,27 +1,40 @@
-# Staged per ADR-8: automation cannot push .github/workflows/*, so this file
-# is written to <repo>/ci/release.yml for a maintainer to promote via
-# admin/rollout/apply-ci-folders.sh.
+# Target: tabnas/mcp -> .github/workflows/release.yml
 #
-# Publishes @tabnas/mcp to npm on a `ts/v*` tag push, via GitHub OIDC Trusted
-# Publishing (no token). The build runs against the ALREADY-PUBLISHED
-# dependency versions (npm i resolves them), so a failing build never
-# publishes. Byte-identical to the release.yml in parser, json, jsonic and
-# expr from `name:` onward.
+# Publishes @tabnas/mcp to npm via GitHub OIDC Trusted Publishing (no
+# token), writes the release tag, then publishes the MCP registry entry
+# and deploys the Cloudflare Worker. See lsp__release.yml for the
+# reasoning behind the dispatch/tagging shape.
 #
-# This repo has no go/, so there is no Go job. The Cloudflare worker is a
-# separate delivery CHANNEL, but it is now part of the release: a tag push
-# publishes to npm, publishes the MCP registry entry, and deploys the Worker,
-# so the three cannot drift apart the way they did on 2026-08-20. The
-# Secrets required: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID for the
-# Worker, and MCP_REGISTRY_DNS_KEY for the registry (the dev.tabnas
-# namespace is DNS-verified, so GitHub OIDC cannot authorise it).
+# STAGED AS PART OF THE M9 SWEEP. This file previously lived at
+# <repo>/ci/release.yml for promotion via apply-ci-folders.sh; it now
+# sits with every other staged workflow, under apply-workflows.sh, so
+# the next fleet-wide change reaches it. Its action pins move to the
+# node24 majors (ADR-16) in all three jobs.
 #
-# Tests are not re-run here — the orchestrator (admin/publish.sh) verifies
-# build+test locally against published deps and requires a green main CI
-# before tagging.
+# THREE CHANNELS, ONE RELEASE, and that is the point of this file. A
+# release publishes to npm, publishes the MCP registry entry, and
+# deploys the Worker, so the three cannot drift apart the way they did
+# on 2026-08-20. publish-registry and deploy-worker chain off
+# publish-npm with `needs:` and carry no ref test, so they run on the
+# dispatch path exactly as they do on a tag push — the invariant is
+# preserved rather than quietly bypassed by the new trigger.
+#
+# NO GO MODULE in this repo, so there is no go/v tag and no `go` input:
+# the dispatch creates ts/v<version> only. Adding a Go input here would
+# offer a tag nothing serves.
+#
+# Secrets required, and neither is OIDC: MCP_REGISTRY_DNS_KEY for the
+# registry (the dev.tabnas namespace is DNS-verified, so GitHub OIDC
+# cannot authorise it), and CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID
+# for the Worker. Only the npm publish is tokenless.
+#
+# Tests are not re-run here — admin/publish.sh verifies build+test
+# locally against published deps, and ci.yml gates the bump PR.
+
 name: release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'ts/v*'
@@ -33,45 +46,82 @@ jobs:
   publish-npm:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: read
+      id-token: write   # OIDC -> npm; cannot write refs
+      contents: write   # GITHUB_TOKEN -> the ts/v tag
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        with:
+          fetch-depth: 0   # tags, for the already-released guard
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-      - name: Build and publish to npm (OIDC trusted publishing)
+
+      - name: Read the version
+        id: v
+        run: |
+          V="$(node -p "require('./ts/package.json').version")"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Releasing $V"
+
+      - name: Refuse a dispatch from anywhere but main
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::release must be dispatched from main (got ${{ github.ref }})"
+          exit 1
+
+      # NOT a hard refusal, and that is the difference from every other
+      # repo in the fleet. Here the tag is not the end of the release:
+      # publish-registry and deploy-worker come after it, and the whole
+      # point of this file is that the three channels ship together. If
+      # npm and the tag succeeded but the registry entry or the Worker
+      # deploy failed, the documented recovery is to re-dispatch — and a
+      # guard that failed closed on the existing tag would skip both
+      # dependent jobs and make that recovery impossible.
+      #
+      # So an existing tag only suppresses the TAG step, exactly as an
+      # already-published version only suppresses the publish step. Both
+      # fail open; the run continues to the downstream jobs either way.
+      - name: Decide whether the tag still needs creating
+        id: tags
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/ts/v$V" >/dev/null; then
+            echo "ts/v$V already exists — leaving it alone and continuing to the downstream jobs"
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Fails OPEN: the REGISTRY, not the tag, decides whether a version
+      # is released, so a run that published and then failed downstream
+      # can be re-dispatched to finish the registry entry and the Worker
+      # without dying on "cannot publish over the previously published
+      # versions".
+      - name: Publish to npm if the version is missing (OIDC)
         working-directory: ts
         run: |
+          V="${{ steps.v.outputs.version }}"
           npm install -g npm@latest
-          npm i
-          npm run build --if-present
-          npm publish --access public
+          if npm view "@tabnas/mcp@$V" version >/dev/null 2>&1; then
+            echo "@tabnas/mcp@$V is already on npm — skipping publish"
+          else
+            npm i
+            npm run build --if-present
+            npm publish --access public
+          fi
 
-  # The npm publish above is the only thing a `ts/v*` tag updated. Everything
-  # else that records this version was a separate manual step, and on
-  # 2026-08-20 two of them silently fell behind: mcp.tabnas.dev served 0.1.7
-  # while npm and the registry said 0.1.9, because two releases went out
-  # without a redeploy.
-  #
-  # Authenticates by DNS, NOT GitHub OIDC. OIDC proves ownership of the
-  # GITHUB ORG and therefore authorises `io.github.tabnas/*` only; this
-  # server is `dev.tabnas/mcp`, deliberately namespaced to the domain
-  # because a domain is the more durable claim. The first attempt used OIDC
-  # and the registry refused it, correctly:
-  #
-  #   403: You have permission to publish: io.github.tabnas/*
-  #        Attempting to publish: dev.tabnas/mcp
-  #
-  # So the namespace choice has a cost: CI needs the Ed25519 key whose
-  # public half is in tabnas.dev's apex TXT record. That key IS recoverable
-  # — generate a new pair and replace the record — which is what makes it
-  # tolerable as a repository secret.
-  #
-  # Runs only after the npm publish succeeds: the registry verifies the npm
-  # package carries a matching `mcpName`, and an entry pointing at a version
-  # npm does not serve is worse than a stale one.
+      - name: Tag the release
+        if: github.event_name == 'workflow_dispatch' && steps.tags.outputs.needed == 'true'
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag "ts/v$V"
+          git push origin "ts/v$V"
+
   publish-registry:
     needs: publish-npm
     runs-on: ubuntu-latest
@@ -79,7 +129,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
       - name: Install mcp-publisher
         run: |
           VERSION=1.8.1
@@ -125,8 +175,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
         with:
           node-version: 24
       - name: Build
