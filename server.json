@@ -3,7 +3,7 @@
   "name": "dev.tabnas/mcp",
   "title": "tabnas",
   "description": "Seven tools over the tabnas parsing engine: parse, validate, diagnose, fixtures, compare.",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "websiteUrl": "https://tabnas.dev/mcp",
   "repository": {
     "url": "https://github.com/tabnas/mcp",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@tabnas/mcp",
-      "version": "0.1.14",
+      "version": "0.1.15",
       "transport": {
         "type": "stdio"
       },
