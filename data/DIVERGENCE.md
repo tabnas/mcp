@@ -23,6 +23,21 @@ to either, the test is not "is this about the Go port?" but "can the two
 engines produce a different result for the same input?" If yes, it
 belongs here, whatever else is true about it.
 
+**This file is prose, and prose rots.** Every entry below that carries
+its own `###` heading is therefore also REGISTERED, per ADR-14, in
+[`test/spec/divergent.tsv`](test/spec/divergent.tsv): a row per case, a
+column per runtime, asserted by BOTH suites. A divergence that gets
+repaired fails that register as loudly as one that regresses, so the row
+— and the entry here — must then be deleted. Where an entry cannot be
+registered yet it is declared, with a reason, in the `notRegistered` map
+in `go/divergent_test.go`; today that is one entry, the fractional
+`rule.maxmul` below, which needs a full value grammar no probe builds
+yet. A gate in the same file fails if an entry here gains no row and no
+exemption, or if an exemption outlives the entry it exempts.
+
+When this file and the register disagree, **the register is what runs**.
+Fix this file to match it, never the other way round.
+
 ## Why this matters more here than elsewhere
 
 This engine is the root of a dependency graph. A divergence here reaches
@@ -135,6 +150,75 @@ a parsed value.
 An entry that leaves this file should leave a forwarding address: a
 reader who remembers one and cannot find it needs to know whether it was
 fixed or quietly dropped.
+
+- **An alt action running after that alt's own error.** Go's `Process`
+  keeps going past an `alt.E` raise — deliberately, since the parser
+  loop only observes `ctx.ParseErr` after `Process` returns — so the
+  alt's `A` still ran and its mutations stuck. TS throws at the raise
+  site and never reaches the action. Harmless while a raised error
+  always discarded the value; visible as soon as recovery began
+  returning a partial one:
+
+  | input | grammar | TypeScript | Go |
+  |---|---|---|---|
+  | `42` | `top: {s:'#NR', e:@boom, a:@mutate}` | `undefined` | `"after-error"` |
+
+  The action is now skipped when THAT alt's own `E` raised. Only its own
+  raise counts: an error already standing from elsewhere does not
+  suppress it, because TS would have thrown before reaching the alt at
+  all, so there is no canonical behaviour to match and skipping would
+  silence actions that legitimately run. The diagnostic context was
+  already snapshotted at the raise site for the same underlying reason;
+  this extends that compensation to the node. Pinned by
+  `TestAltActionSkippedAfterItsOwnError` and the TS case "an alt action
+  does not run after its own error".
+
+- **The value kept when recovery gives up.** Two defects, same fallback,
+  both Go-only and both repaired. (1) A give-up inside a structure
+  leaves the root open, and Go returned `nil` where TS returns the most
+  complete partial container — `[1 : abc def ghi]` gave `[1]` in TS and
+  `null` in Go. (2) The fallback then consulted only Go's
+  replacement-chain `resRule`, which is the right answer for a parse
+  that COMPLETED but is not TS's `ctx.root()`: the latter is the rule
+  the parse started with, set once and never followed through
+  replacement. A start rule whose node was set before it was replaced
+  therefore survived in TS and was skipped in Go —
+  `rule.start "top"`, node `"old"`, replaced by `val`, on the same
+  input: TS `"old"`, Go `[1]`. Go now prefers the original root, then
+  the outermost active rule, then `ctx.rule`, matching TS's order, and
+  tests both missing-node cases with a nullish predicate rather than
+  `IsUndefined`, since TS's `null ==` covers null and undefined alike.
+
+  Pinned in both ports (`TestRecoverGiveUpKeepsPartialValue`,
+  `TestRecoverGiveUpWithReplacedStartRule`,
+  `TestRecoverGiveUpTreatsNilRootAsMissing` and their TS mirrors).
+  A note for whoever writes the next fixture here: `rule.start` is
+  load-bearing in the replacement cases. Leave it at the default and
+  the custom start rule is never entered, its before-open action never
+  runs, and the case silently degenerates into an ordinary parse that
+  agrees in both ports — which is how the second defect was first
+  measured as a non-divergence and nearly dismissed.
+- **Builtin config reaching a child rule in Go.** Carried a table
+  showing that a parent declaring `k: {value$: {from: 1}}` WITHOUT
+  running the builtin handed it to a child running `@value$` bare — `4`
+  in Go against TypeScript's `3` for the same function-free serialized
+  grammar. Go's builtins read `r.K`, and `k` propagates on push and
+  replace; TypeScript's read the matched alternate.
+
+  Repaired by ruling #120's A1: config is bound when the GRAMMAR LOADS,
+  so it never enters `r.K` and there is one regime — the alternate that
+  declares the config is the alternate that gets it. Go's five
+  delete-after-read calls went with it; they were containment for a
+  design that no longer exists, and were themselves a third scoping
+  semantics (consumed-once here, alternate-scoped there), which is why
+  the run-then-push shape used to agree for the wrong reason.
+
+  Kept as PARITY tests rather than deleted —
+  `TestBuiltinConfigIsAlternateScoped` in both ports, over the same two
+  shapes. Both now answer `3`. The pair is worth keeping because the
+  regression is silent: restoring an `r.K` read would leave every
+  fleet grammar working, since all four declaration sites pair a config
+  with its action on the same alternate.
 
 - **Bad-token spans and codes for invalid string escapes.** Carried a
   table of `len`/`pos`/`col` differences and, at one point, the claim
