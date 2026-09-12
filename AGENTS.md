@@ -83,16 +83,29 @@ orchestrator's path (`admin/publish.sh`), not yours.
 
 The steps, in order:
 
-1. Bump the single version site, `ts/package.json`.
-2. Verify, building first:
+1. Bump all **three** version sites together — `ts/package.json`, both
+   `"version"` fields in `server.json` and `ts/package-lock.json`
+   (regenerated, not hand-edited).
+2. Verify against the **published** dependencies rather than your checkout.
+   The release runner installs fresh from the registry; a working tree
+   usually does not, so reproduce that before believing anything:
 
    ```bash
-   (cd ts && npm run build && npm test)
+   cd ts
+   # package-lock.json is TRACKED here — regenerate it, do not delete it
+   rm -rf node_modules
+   npm install
+   npm test
    ```
 
-   This package's `npm test` happens to run `npm run build` first, so the
-   build above is redundant here — keep it anyway, because the sibling
-   repos' do not and the habit is what travels.
+   **Removing the lockfile is not enough on its own.** It does not touch
+   `node_modules`, and the sibling symlinks that make local development work
+   (`ts/node_modules/@tabnas/…` pointing at a checkout) survive it — the
+   suite then passes against unreleased code while appearing to verify the
+   published one. Reinstalling is the part that matters.
+
+   `npm test` already compiles here — the `test` script itself begins with
+   `npm run build`. No separate build step is needed.
 3. **Merge the bump through a reviewed PR.** That is the house convention —
    `CONTRIBUTING.md` squash-merges PRs and takes the title as the commit
    message — and what `release.yml`'s own header describes. A direct push to
@@ -102,22 +115,34 @@ The steps, in order:
 4. **Wait for `main` CI to go green on the bump commit.** The release
    workflow **has no test step** — it reads `main`, builds against
    already-published dependencies, publishes and tags. `ci.yml` on the bump
-   PR is the only gate there is. An npm version is immutable.
+   commit is the only gate there is. An npm version is immutable.
 5. Dispatch `release.yml` on `main`.
-6. Confirm `npm view @tabnas/mcp@$V version`, and that `refs/tags/ts/v$V`
-   exists: `git ls-remote --tags origin "refs/tags/ts/v$V"`.
+6. Confirm — and make the check **fail**, not merely print:
+
+   ```bash
+   V=x.y.z
+   npm view @tabnas/mcp@$V version
+   git ls-remote --exit-code --tags origin "refs/tags/ts/v$V" >/dev/null \
+     || { echo "ts/v$V not tagged"; exit 1; }
+   ```
+
+   `… | grep v$V` is not a check — `grep` exits 0 on a partial match.
+
+### When a dispatch dies half-way
 
 The workflow fails closed on a dispatch from any ref but `main`, and when
 every tag it would create already exists (the "you forgot to bump" signal).
 It fails *open* on an already-published npm version, so a run that published
-and then died before tagging is repairable by re-dispatching rather than
-stuck.
+and then died before tagging can be re-dispatched — **but only while `main`
+still points at the release commit.**
 
-One trap still applies here — `ts/package-lock.json`: it is gitignored, it
-pins the previous versions, and `npm install` after a dependency bump will
-happily keep them — the suite then passes against the packages you were
-replacing. Delete it before verifying. A green run against the version you
-were trying to replace is the only kind of green worth distrusting.
+That caveat is the sharp edge. The repair logic anchors new tags to an
+*existing* tag. If the run published to npm and died before the atomic push,
+no tag exists to supply that anchor — so if `main` has moved on, the anchor
+falls back to the new `HEAD` while the publish step skips the version
+already on npm. The tag then land on a commit that is not the one npm
+serves. In that state, recover the original SHA and tag it by hand, or bump
+to the next patch. Do not just re-dispatch.
 
 ### Never commit the local wiring
 
