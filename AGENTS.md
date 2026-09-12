@@ -62,6 +62,110 @@ structural grammar validation is runtime behaviour of
    fail on a forgotten regeneration. Do not hand-edit `data/`; fix the
    source and run `npm run gen-data`.
 
+## Releasing
+
+Publishing is **dispatch-driven and runs in CI**, never locally:
+[`.github/workflows/release.yml`](.github/workflows/release.yml) publishes
+`@tabnas/mcp` to npm over GitHub OIDC trusted publishing (no token,
+provenance attached). A local `npm publish` goes out over a token and
+bypasses OIDC entirely — do not use it for a release.
+
+### Dispatch it; do not push the tag
+
+**Run the workflow with `workflow_dispatch` on `main`.** That is the path
+the workflow's own header calls normal, and it is the only one an agent can
+take: **a session's credentials cannot push tag refs — `git push origin
+ts/v…` fails with HTTP 403**, while branch pushes from the same credentials
+succeed. It is a ref-type boundary, not a broken token or a network fault.
+Nothing is lost by never touching a tag, because the workflow creates the
+tag itself, *after* npm accepts the publish. Pushing a tag by hand is the
+orchestrator's path (`admin/publish.sh`), not yours.
+
+The steps, in order:
+
+1. Bump all **three** version sites together — `ts/package.json`, both
+   `"version"` fields in `server.json` and `ts/package-lock.json`
+   (regenerated, not hand-edited).
+2. Verify against the **published** dependencies rather than your checkout.
+   The release runner installs fresh from the registry; a working tree
+   usually does not, so reproduce that before believing anything:
+
+   ```bash
+   cd ts
+   # package-lock.json is TRACKED here — regenerate it, do not delete it
+   rm -rf node_modules
+   npm install
+   npm test
+   ```
+
+   **Removing the lockfile is not enough on its own.** It does not touch
+   `node_modules`, and the sibling symlinks that make local development work
+   (`ts/node_modules/@tabnas/…` pointing at a checkout) survive it — the
+   suite then passes against unreleased code while appearing to verify the
+   published one. Reinstalling is the part that matters.
+
+   `npm test` already compiles here — the `test` script itself begins with
+   `npm run build`. No separate build step is needed.
+3. **Merge the bump through a reviewed PR.** That is the house convention —
+   `CONTRIBUTING.md` squash-merges PRs and takes the title as the commit
+   message — and what `release.yml`'s own header describes. A direct push to
+   `main` is a recovery path, not the normal one: CI still gates it, but
+   nothing reviews it, and step 5 then publishes that unreviewed commit
+   immutably. If you take it, say so.
+4. **Wait for `main` CI to go green on the bump commit.** The release
+   workflow **has no test step** — it reads `main`, builds against
+   already-published dependencies, publishes and tags. `ci.yml` on the bump
+   commit is the only gate there is. An npm version is immutable.
+5. Dispatch `release.yml` on `main`.
+6. Confirm. **This release has three jobs, not one** — `publish-npm`,
+   `publish-registry` and `deploy-worker` — so npm and the tag can both look
+   right while a channel is stale. Require the whole run to have succeeded,
+   then:
+
+   ```bash
+   V=x.y.z
+   npm view @tabnas/mcp@$V version
+   git ls-remote --exit-code --tags origin "refs/tags/ts/v$V" >/dev/null \
+     || { echo "ts/v$V not tagged"; exit 1; }
+   node ts/tools/check-published.js
+   ```
+
+   `… | grep v$V` is not a check — `grep` exits 0 on a partial match.
+   `check-published.js` is what covers the registry entry and the hosted
+   Worker; the first two lines do not.
+
+### When a dispatch dies half-way
+
+The workflow fails closed on a dispatch from any ref but `main`. It does
+**not** fail closed on an existing tag here — unlike the fleet-standard
+shape, this one sets `needed=false`, skips only the tag step, and lets
+`publish-registry` and `deploy-worker` run anyway. That is deliberate: it is
+the repair path for a run where npm and the tag landed but a downstream job
+did not, so re-dispatching is the right move rather than something to work
+around.
+
+The one case that is not repairable by re-dispatch is a run that published
+to npm and died before the tag was written. No tag then exists to anchor the
+repair, so once `main` moves the anchor falls back to the new `HEAD` while
+the publish step skips the version already on npm — tagging a commit npm
+never served. Recover the original SHA and tag it by hand, or bump to the
+next patch.
+
+### Never commit the local wiring
+
+Testing against unreleased siblings means symlinked `node_modules`. None of
+it may reach a commit, and `git add -A` is how it does:
+
+- A symlinked `ts/node_modules/@tabnas/…` pointing at a sibling checkout.
+  `npm ci`, or deleting `node_modules`, silently replaces it with a registry
+  copy — a suite that still passes, against the published package rather
+  than your change.
+- Scratch files — anything written to measure something.
+
+Stage deliberately (`git add <path>`) and read `git status --short` before
+every commit. This bites hardest on a PR whose CI is *expected* red for a
+known dependency: a fresh breakage hides inside the expected failure.
+
 ## Untrusted input — the firewall (ADR-10, non-negotiable)
 
 A serialized grammar and its options are **data, never code**. Every
