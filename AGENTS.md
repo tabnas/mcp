@@ -91,11 +91,13 @@ The steps, in order:
    usually does not, so reproduce that before believing anything:
 
    ```bash
-   cd ts
-   # package-lock.json is TRACKED here — regenerate it, do not delete it
-   rm -rf node_modules
-   npm install
-   npm test
+   (
+     cd ts
+     # package-lock.json is TRACKED here — regenerate it, do not delete it
+     rm -rf node_modules
+     npm install
+     npm test
+   )
    ```
 
    **Removing the lockfile is not enough on its own.** It does not touch
@@ -116,7 +118,30 @@ The steps, in order:
    workflow **has no test step** — it reads `main`, builds against
    already-published dependencies, publishes and tags. `ci.yml` on the bump
    commit is the only gate there is. An npm version is immutable.
-5. Dispatch `release.yml` on `main`.
+5. **Record the release commit, then dispatch.** Step 6 compares the tag
+   against the commit you released, so capture it *before* the dispatch,
+   and read it from the remote rather than a local ref that may be stale:
+
+   ```bash
+   REL=$(git ls-remote origin refs/heads/main | cut -f1)
+   ```
+
+   Then dispatch `release.yml` on `main`.
+
+   Keep that SHA — this repo needs it more than the rest of the fleet, not
+   less. Both guards above fail **open**: an already-published version
+   suppresses the publish step, an existing tag suppresses the tag step,
+   and the run carries on to `publish-registry` and `deploy-worker` so a
+   half-finished release can be repaired by re-dispatching. The gap that
+   leaves is a run whose npm publish succeeded but whose tag push did not.
+   If `main` moves before the re-dispatch, the publish step skips (the
+   version is on npm already) while the tag step — finding no tag — runs
+   and tags the *new* `main`. `ts/v$V` then names a commit npm never
+   served. Re-reading `main` at repair time cannot detect that: it returns
+   the same moved commit the faulty tag points at, so the check would agree
+   with itself and pass. If you no longer have the SHA, recover it from the
+   original run — the `head_sha` of that `release.yml` run is the commit it
+   published.
 6. Confirm. **This release has three jobs, not one** — `publish-npm`,
    `publish-registry` and `deploy-worker` — so npm and the tag can both look
    right while a channel is stale. Require the whole run to have succeeded,
@@ -125,14 +150,20 @@ The steps, in order:
    ```bash
    V=x.y.z
    npm view @tabnas/mcp@$V version
-   git ls-remote --exit-code --tags origin "refs/tags/ts/v$V" >/dev/null \
-     || { echo "ts/v$V not tagged"; exit 1; }
+   S=$(git ls-remote origin "refs/tags/ts/v$V" | cut -f1)
+   [ -n "$S" ] || { echo "ts/v$V not tagged"; exit 1; }
+   [ "$S" = "$REL" ] || { echo "ts/v$V is $S, expected $REL"; exit 1; }
    node ts/tools/check-published.js
    ```
 
    `… | grep v$V` is not a check — `grep` exits 0 on a partial match.
+   Nor is the tag's mere existence: the skipped-tag path above can leave
+   `ts/v$V` on a commit npm never served, and `--exit-code` reports that as
+   success. Comparing it against `$REL` is what catches it. The ref carries
+   the commit directly — `release.yml` uses `git tag "ts/v$V"` with no
+   `-a`, so it is lightweight and there is no `^{}` to peel.
    `check-published.js` is what covers the registry entry and the hosted
-   Worker; the first two lines do not.
+   Worker; the lines above it do not.
 
 ### When a dispatch dies half-way
 
