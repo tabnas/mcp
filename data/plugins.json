@@ -606,6 +606,39 @@
     },
     {
       "$schema": "https://tabnas.dev/schema/plugin.schema.json",
+      "name": "@tabnas/semver",
+      "go": "github.com/tabnas/semver/go",
+      "description": "Semantic Versioning 2.0.0 (semver.org) parsing for the tabnas engine, compiled from an ABNF grammar.",
+      "base": "@tabnas/abnf",
+      "engine": "@tabnas/parser",
+      "grammar": "semver-grammar.abnf",
+      "extensions": [],
+      "languageId": "semver",
+      "pluginKind": "grammar",
+      "grammarKind": "closure",
+      "lexStream": "clean",
+      "syncGroups": [
+        "end"
+      ],
+      "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnassemver",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
+      "errorCodes": [],
+      "docs": "https://tabnas.dev/docs/packages",
+      "repository": "https://github.com/tabnas/semver",
+      "versionSource": "ts/package.json"
+    },
+    {
+      "$schema": "https://tabnas.dev/schema/plugin.schema.json",
       "name": "@tabnas/toml",
       "go": "github.com/tabnas/toml/go",
       "description": "TOML parsing for the tabnas engine.",
