@@ -62,6 +62,78 @@ structural grammar validation is runtime behaviour of
    fail on a forgotten regeneration. Do not hand-edit `data/`; fix the
    source and run `npm run gen-data`.
 
+## Releasing
+
+Publishing is **dispatch-driven and runs in CI**, never locally:
+[`.github/workflows/release.yml`](.github/workflows/release.yml) publishes
+`@tabnas/mcp` to npm over GitHub OIDC trusted publishing (no token,
+provenance attached). A local `npm publish` goes out over a token and
+bypasses OIDC entirely — do not use it for a release.
+
+### Dispatch it; do not push the tag
+
+**Run the workflow with `workflow_dispatch` on `main`.** That is the path
+the workflow's own header calls normal, and it is the only one an agent can
+take: **a session's credentials cannot push tag refs — `git push origin
+ts/v…` fails with HTTP 403**, while branch pushes from the same credentials
+succeed. It is a ref-type boundary, not a broken token or a network fault.
+Nothing is lost by never touching a tag, because the workflow creates the
+tag itself, *after* npm accepts the publish. Pushing a tag by hand is the
+orchestrator's path (`admin/publish.sh`), not yours.
+
+The steps, in order:
+
+1. Bump the single version site, `ts/package.json`.
+2. Verify, building first:
+
+   ```bash
+   (cd ts && npm run build && npm test)
+   ```
+
+   This package's `npm test` happens to run `npm run build` first, so the
+   build above is redundant here — keep it anyway, because the sibling
+   repos' do not and the habit is what travels.
+3. **Merge the bump through a reviewed PR.** That is the house convention —
+   `CONTRIBUTING.md` squash-merges PRs and takes the title as the commit
+   message — and what `release.yml`'s own header describes. A direct push to
+   `main` is a recovery path, not the normal one: CI still gates it, but
+   nothing reviews it, and step 5 then publishes that unreviewed commit
+   immutably. If you take it, say so.
+4. **Wait for `main` CI to go green on the bump commit.** The release
+   workflow **has no test step** — it reads `main`, builds against
+   already-published dependencies, publishes and tags. `ci.yml` on the bump
+   PR is the only gate there is. An npm version is immutable.
+5. Dispatch `release.yml` on `main`.
+6. Confirm `npm view @tabnas/mcp@$V version`, and that `refs/tags/ts/v$V`
+   exists: `git ls-remote --tags origin "refs/tags/ts/v$V"`.
+
+The workflow fails closed on a dispatch from any ref but `main`, and when
+every tag it would create already exists (the "you forgot to bump" signal).
+It fails *open* on an already-published npm version, so a run that published
+and then died before tagging is repairable by re-dispatching rather than
+stuck.
+
+One trap still applies here — `ts/package-lock.json`: it is gitignored, it
+pins the previous versions, and `npm install` after a dependency bump will
+happily keep them — the suite then passes against the packages you were
+replacing. Delete it before verifying. A green run against the version you
+were trying to replace is the only kind of green worth distrusting.
+
+### Never commit the local wiring
+
+Testing against unreleased siblings means symlinked `node_modules`. None of
+it may reach a commit, and `git add -A` is how it does:
+
+- A symlinked `ts/node_modules/@tabnas/…` pointing at a sibling checkout.
+  `npm ci`, or deleting `node_modules`, silently replaces it with a registry
+  copy — a suite that still passes, against the published package rather
+  than your change.
+- Scratch files — anything written to measure something.
+
+Stage deliberately (`git add <path>`) and read `git status --short` before
+every commit. This bites hardest on a PR whose CI is *expected* red for a
+known dependency: a fresh breakage hides inside the expected failure.
+
 ## Untrusted input — the firewall (ADR-10, non-negotiable)
 
 A serialized grammar and its options are **data, never code**. Every
