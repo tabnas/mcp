@@ -165,6 +165,19 @@ The steps, in order:
    `check-published.js` is what covers the registry entry and the hosted
    Worker; the lines above it do not.
 
+   A mismatch has two causes, so read the dispatched run's `head_sha`
+   before concluding which. Equal to `$REL`: the run released the commit
+   you recorded and the *tag* is wrong — the skipped-tag path above.
+   Not equal: `main` advanced between your capture and the run's
+   checkout, so the tag agrees with what shipped, but what shipped is not
+   the commit you cleared CI on in step 4. Both need looking at, which is
+   why this check is deliberately the conservative way round.
+
+   Do **not** make `head_sha` the thing you compare the tag against. On a
+   repair re-dispatch it is the *new* checkout, so a tag written on that
+   commit matches it while npm still serves the original — the one case
+   this check exists to catch.
+
 ### When a dispatch dies half-way
 
 The workflow fails closed on a dispatch from any ref but `main`. It does
