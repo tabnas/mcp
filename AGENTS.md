@@ -117,32 +117,39 @@ The steps, in order:
    already-published dependencies, publishes and tags. `ci.yml` on the bump
    commit is the only gate there is. An npm version is immutable.
 5. Dispatch `release.yml` on `main`.
-6. Confirm — and make the check **fail**, not merely print:
+6. Confirm. **This release has three jobs, not one** — `publish-npm`,
+   `publish-registry` and `deploy-worker` — so npm and the tag can both look
+   right while a channel is stale. Require the whole run to have succeeded,
+   then:
 
    ```bash
    V=x.y.z
    npm view @tabnas/mcp@$V version
    git ls-remote --exit-code --tags origin "refs/tags/ts/v$V" >/dev/null \
      || { echo "ts/v$V not tagged"; exit 1; }
+   node ts/tools/check-published.js
    ```
 
    `… | grep v$V` is not a check — `grep` exits 0 on a partial match.
+   `check-published.js` is what covers the registry entry and the hosted
+   Worker; the first two lines do not.
 
 ### When a dispatch dies half-way
 
-The workflow fails closed on a dispatch from any ref but `main`, and when
-every tag it would create already exists (the "you forgot to bump" signal).
-It fails *open* on an already-published npm version, so a run that published
-and then died before tagging can be re-dispatched — **but only while `main`
-still points at the release commit.**
+The workflow fails closed on a dispatch from any ref but `main`. It does
+**not** fail closed on an existing tag here — unlike the fleet-standard
+shape, this one sets `needed=false`, skips only the tag step, and lets
+`publish-registry` and `deploy-worker` run anyway. That is deliberate: it is
+the repair path for a run where npm and the tag landed but a downstream job
+did not, so re-dispatching is the right move rather than something to work
+around.
 
-That caveat is the sharp edge. The repair logic anchors new tags to an
-*existing* tag. If the run published to npm and died before the atomic push,
-no tag exists to supply that anchor — so if `main` has moved on, the anchor
-falls back to the new `HEAD` while the publish step skips the version
-already on npm. The tag then land on a commit that is not the one npm
-serves. In that state, recover the original SHA and tag it by hand, or bump
-to the next patch. Do not just re-dispatch.
+The one case that is not repairable by re-dispatch is a run that published
+to npm and died before the tag was written. No tag then exists to anchor the
+repair, so once `main` moves the anchor falls back to the new `HEAD` while
+the publish step skips the version already on npm — tagging a commit npm
+never served. Recover the original SHA and tag it by hand, or bump to the
+next patch.
 
 ### Never commit the local wiring
 
