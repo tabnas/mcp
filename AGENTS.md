@@ -176,11 +176,12 @@ The steps, in order:
    ```
 
    That is what shipped, and it is the value `ts/v$V` must equal. If it
-   does, `$REL` is the stale one — captured from a `main` that had already
-   moved — and the release is sound. If it does not, move the tag onto the
-   `gitHead` commit: nothing here caches a version's content the way
-   `proxy.golang.org` does for the Go fleet, so retagging is the fix, not
-   a new release.
+   does not, move the tag onto the `gitHead` commit: nothing here caches a
+   version's content the way `proxy.golang.org` does for the Go fleet, so
+   retagging is the fix, not a new release. If it does but `gitHead` is
+   not `$REL`, the tag is honest and `$REL` is the stale capture, but what
+   shipped is a commit you never cleared CI on — `release.yml` runs no
+   tests of its own — so confirm `gitHead` is green on `main` first.
 
 ### When a dispatch dies half-way
 
