@@ -165,18 +165,30 @@ The steps, in order:
    `check-published.js` is what covers the registry entry and the hosted
    Worker; the lines above it do not.
 
-   A mismatch has two causes, so read the dispatched run's `head_sha`
-   before concluding which. Equal to `$REL`: the run released the commit
-   you recorded and the *tag* is wrong — the skipped-tag path above.
-   Not equal: `main` advanced between your capture and the run's
-   checkout, so the tag agrees with what shipped, but what shipped is not
-   the commit you cleared CI on in step 4. Both need looking at, which is
-   why this check is deliberately the conservative way round.
+   A mismatch has three causes and `head_sha` does not tell them apart —
+   the **publish** and **tag** steps' logs do. There is no anchor here:
+   when the tag step runs at all, it tags this run's `HEAD`.
 
-   Do **not** make `head_sha` the thing you compare the tag against. On a
-   repair re-dispatch it is the *new* checkout, so a tag written on that
-   commit matches it while npm still serves the original — the one case
-   this check exists to catch.
+   - The tag step logged `ts/v$V already exists — leaving it alone` —
+     the tag predates this run and names the commit that release shipped
+     from. It is `$REL` that is stale: you re-dispatched a version that
+     was already tagged.
+   - The tag step wrote the tag and the publish step **published** —
+     both on this run's checkout, so `main` advanced between your capture
+     and that checkout. The tag agrees with what shipped; what shipped is
+     not the commit you cleared CI on in step 4.
+   - The tag step wrote the tag and the publish step **skipped**
+     (`already on npm — skipping publish`) — the tag names this repair
+     checkout while npm still serves the original run's build. That is
+     the skipped-tag path above; recover the original run's `head_sha`
+     and fix the tag by hand.
+
+   So do **not** make `head_sha` the thing you compare the tag against.
+   It is what recovers a lost `$REL`, and — read with the publish step —
+   what tells you which case you are in; it is never what the tag is
+   measured against. In the third case it is written on this run's
+   `HEAD`, so it matches while npm still serves the original, which is
+   the one case this check exists to catch.
 
 ### When a dispatch dies half-way
 
