@@ -150,9 +150,12 @@ The steps, in order:
    ```bash
    V=x.y.z
    npm view @tabnas/mcp@$V version
+   GH=$(npm view @tabnas/mcp@$V gitHead)
+   [ -n "$GH" ] || { echo "npm records no gitHead for $V"; exit 1; }
    S=$(git ls-remote origin "refs/tags/ts/v$V" | cut -f1)
    [ -n "$S" ] || { echo "ts/v$V not tagged"; exit 1; }
-   [ "$S" = "$REL" ] || { echo "ts/v$V is $S, expected $REL"; exit 1; }
+   [ "$S" = "$GH" ] || { echo "ts/v$V is $S, but npm shipped $GH"; exit 1; }
+   [ "$GH" = "$REL" ] || { echo "shipped $GH, not the $REL you cleared"; exit 1; }
    node ts/tools/check-published.js
    ```
 
@@ -165,18 +168,21 @@ The steps, in order:
    `check-published.js` is what covers the registry entry and the hosted
    Worker; the lines above it do not.
 
-   A mismatch has two causes, so read the dispatched run's `head_sha`
-   before concluding which. Equal to `$REL`: the run released the commit
-   you recorded and the *tag* is wrong — the skipped-tag path above.
-   Not equal: `main` advanced between your capture and the run's
-   checkout, so the tag agrees with what shipped, but what shipped is not
-   the commit you cleared CI on in step 4. Both need looking at, which is
-   why this check is deliberately the conservative way round.
+   `$REL` is deliberately not what the tag is measured against. It is your
+   record of what you meant to release, and a re-dispatch can make the tag
+   agree with it while npm serves something else: publish from A, lose the
+   tag, re-capture `main` at B, and the repair tags B — so a `$REL`-only
+   check passes while the registry still serves A. `gitHead` is npm's own
+   record of the commit the tarball was built from, so that is what the
+   tag is checked against, and `$REL` is checked separately, as the CI
+   question it actually is.
 
-   Do **not** make `head_sha` the thing you compare the tag against. On a
-   repair re-dispatch it is the *new* checkout, so a tag written on that
-   commit matches it while npm still serves the original — the one case
-   this check exists to catch.
+   If the tag line fails, move `ts/v$V` onto the `$GH` commit: nothing
+   here caches a version's content the way `proxy.golang.org` does for the
+   Go fleet, so retagging is the fix, not a new release. If the last line
+   fails instead, the tag is honest and `$REL` is the stale capture, but
+   what shipped is a commit you never cleared CI on — `release.yml` runs
+   no tests of its own — so confirm `$GH` is green on `main` first.
 
 ### When a dispatch dies half-way
 
