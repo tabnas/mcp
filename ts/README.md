@@ -2,13 +2,13 @@
 
 The tabnas agent tooling: an [MCP](https://modelcontextprotocol.io)
 server (stdio) and the unified `tabnas` CLI, two thin front-ends over
-one core so they cannot disagree — for the same request, the CLI's
+one core so they cannot disagree: for the same request, the CLI's
 `--json` output and the MCP tool result are byte-identical.
 
 Six tools only: `parse`, `validate_grammar`, `explain_parse_error`,
 `test_grammar`, `list_plugins`, `describe_plugin`. Five resources:
 the serialized-grammar schema, the diagnostic schema, the error-code
-registry, the plugin descriptors, and the engine's divergence record —
+registry, the plugin descriptors, and the engine's divergence record.
 all bundled, generated copies of the fleet's contract files.
 
 ## Install

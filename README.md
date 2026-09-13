@@ -1,12 +1,12 @@
 # tabnas/mcp
 
-The tabnas agent tooling: **one TypeScript codebase, two front-ends** —
+The tabnas agent tooling: **one TypeScript codebase, two front-ends**:
 an [MCP](https://modelcontextprotocol.io) server (stdio) and the unified
-`tabnas` CLI — sharing a single core (`ts/src/core.ts`) so the two can
+`tabnas` CLI, sharing a single core (`ts/src/core.ts`) so the two can
 never disagree. For each operation the CLI's `--json` output and the MCP
 tool result are **byte-identical**, and the test suite holds them to it.
 
-The website page for this package — per-client setup, the tool contracts, the hosted endpoint's bounds: **[tabnas.dev/mcp](https://tabnas.dev/mcp/)**.
+The website page for this package: per-client setup, the tool contracts, the hosted endpoint's bounds: **[tabnas.dev/mcp](https://tabnas.dev/mcp/)**.
 
 Published as `@tabnas/mcp`. This repo is TypeScript-only: it is tooling
 over the engine, not a parity package, so there is no Go port.
@@ -31,7 +31,7 @@ MCP client configuration (stdio):
 }
 ```
 
-Fill in `<x.y.z>` with the current version — `npm view @tabnas/mcp
+Fill in `<x.y.z>` with the current version: `npm view @tabnas/mcp
 version`. This README does not name it: a repo cannot carry an exact pin
 of its own published version, because the commit that updates it becomes
 the next release's content, leaving it one release behind forever.
@@ -41,7 +41,7 @@ The server is started by the `mcp` subcommand of the CLI
 invokes as `npx --yes @tabnas/mcp@<x.y.z> mcp`. (`--yes` matters: on a
 cache miss `npx` would otherwise prompt on the stdin the MCP transport
 owns. Pin an exact version so the tools cannot drift under an installed
-client — `skills/mcp.json` carries the real one, written from the
+client: `skills/mcp.json` carries the real one, written from the
 registry by its `tools/sync-mcp-pin.js` and checked by
 `tools/validate.js --online`.)
 
@@ -61,7 +61,7 @@ Notes on the contracts:
 
 - Every operation builds a **fresh engine instance** per call. `parse`
   applies `options` first, then `grammar`. With no grammar the instance
-  is exactly what `new Tabnas()` gives — the bare engine defines no
+  is exactly what `new Tabnas()` gives: the bare engine defines no
   rules, so every input yields an undefined tree (serialized as
   `{"ok":true}`).
 - A `grammar` argument is **validated before it is used**, by every
@@ -76,19 +76,19 @@ Notes on the contracts:
   never code. A firewall runs first on every grammar-accepting op and on
   request options, rejecting: any own key named `__proto__`,
   `constructor`, or `prototype` anywhere in the tree (prototype-pollution
-  defense — the engine's grammar merge has no `__proto__` guard); a `ref`
+  defense, since the engine's grammar merge has no `__proto__` guard); a `ref`
   key (live functions are not JSON); any function reference that is not a
   `$`-suffixed engine builtin; a `plugins` key, whether a request option
   or inside `grammar.options` (a plugin is live code); and grammars over
   5000 rules (a CPU bound). "Validate this grammar" never becomes "run
   this code", or "pollute this process".
-- A non-diagnostic engine throw (e.g. `options.parser.start` set to a
+- A non-diagnostic engine throw (for example, `options.parser.start` set to a
   non-function) is caught and returned as the same clean
   `{ok:false, errors:[{path:"",message}]}` shape, so the CLI and the MCP
   tool agree.
 - `explain_parse_error` joins the diagnostic with the bundled error-code
   registry entry (`{code, message, hint}`); `registry` is `null` for a
-  code the registry does not know (e.g. a plugin-declared code).
+  code the registry does not know (for example, a plugin-declared code).
 - `test_grammar` takes TSV **content** in the fleet fixture convention
   (`@tabnas/support`): line 1 is a header, the input column is
   escape-decoded, the expected column is JSON or `ERROR` /
@@ -117,7 +117,7 @@ The CLI never touches the network. `tabnas mcp` starts the stdio MCP
 server (the same server as `npx @tabnas/mcp`); it speaks JSON-RPC on
 stdout and prints nothing else there.
 
-`--json` prints **exactly** the core result JSON — the same bytes the
+`--json` prints **exactly** the core result JSON: the same bytes the
 MCP tool returns for the same request (stable key order; the golden
 contract, enforced by `ts/test/golden.test.js`). Without `--json` you
 get a readable rendering; a parse failure prints the engine's own
@@ -133,7 +133,7 @@ Exit codes:
 
 ## Passing a grammar that isn't already a GrammarSpec
 
-Every tool takes a **serialized GrammarSpec** — pure JSON. It does not take
+Every tool takes a **serialized GrammarSpec**, pure JSON. It does not take
 ABNF, EBNF, GBNF or jsonic source, and it never will: compiling those means
 running a compiler, and the tools' one hard rule is that a grammar is data,
 never code (ADR-10). Compile first, then pass the result.
@@ -152,8 +152,8 @@ alternatives are both wrong:
   a grammar file; not what a tool argument wants.
 - `abnfConvert()` alone returns a spec carrying `ref` (empty, when converted
   with `builtins: true`) and mark fields. The firewall rejects the *presence*
-  of `ref`, not just its contents — deliberately, since "empty enough" is not
-  a property worth reasoning about at a security boundary — and `m` marks are
+  of `ref`, not merely its contents, deliberately, since "empty enough" is not
+  a property worth reasoning about at a security boundary, and `m` marks are
   not part of the serialized form. `toPureSpec` strips both and stamps `v`.
 
 `toRecognitionSpec` is the same thing for a grammar that only needs to decide
@@ -166,9 +166,9 @@ where `g.json` is whatever your build step wrote.
 
 Two questions, reported separately, because they fail differently:
 
-1. **Acceptance** — does the candidate still accept what the baseline
+1. **Acceptance.** Does the candidate still accept what the baseline
    accepted?
-2. **Output** — for inputs both accept, is the resulting tree the same?
+2. **Output.** For inputs both accept, is the resulting tree the same?
 
 The second is the one users feel. A change that still accepts every
 historical document but reshapes the tree silently breaks every downstream
@@ -179,12 +179,12 @@ is deliberately no `compatible: true` field. Language inclusion is
 undecidable in general, so a tool that printed one would eventually be wrong
 in production:
 
-- `proven[]` — what was established statically, and on what basis. Anything
+- `proven[]`. What was established statically, and on what basis. Anything
   outside the decidable subset is `not-proven`, which is a statement about
   this tool, **not** a claim that the grammars are incompatible.
-- `observed[]` — what actually ran, and how much of it.
-- `changes[]` / `counterexamples[]` — concrete differences, with inputs.
-- `confidence` + `why` — how much weight the *absence* of findings can bear.
+- `observed[]`. What actually ran, and how much of it.
+- `changes[]` / `counterexamples[]`. Concrete differences, with inputs.
+- `confidence` + `why`. How much weight the *absence* of findings can bear.
   `confidence: "low"` with a stated reason is a **successful** run.
 
 The check that earns its keep is alternate **ordering**. Alternates are
@@ -194,7 +194,7 @@ walks positions, not membership, and reports a shadowed alternate that used
 to be reachable.
 
 `--corpus` takes a `.tsv` fixture file or a directory of them, loaded through
-`@tabnas/support` — the same loader the fixture runners use. Real inputs are
+`@tabnas/support`, the same loader the fixture runners use. Real inputs are
 the only tier that measures what your documents actually do:
 
 ```bash
@@ -207,7 +207,7 @@ Exit code is 1 when any change is found, so it works as a release gate.
 
 `mcp.tabnas.dev` serves the same seven tools over streamable HTTP
 (`POST /mcp`, plus `GET /health` and `GET /.well-known/mcp`), for agents
-that cannot run `npx`. **Local stdio stays the recommended path** — it is
+that cannot run `npx`. **Local stdio stays the recommended path**: it is
 free, private, reproducible and unlimited.
 
 The hosted service is the same core, so it answers identically; it is
@@ -216,10 +216,10 @@ infrastructure. A 256 KB body cap and 60 requests per minute per IP,
 both reported up front by `/.well-known/mcp` and named in the refusal
 (`limit_exceeded` / `rate_limited`) along with the local alternative.
 The rate limit is Cloudflare's, which counts per IP **per data centre**
-and approximately — so it is a shield against sustained abuse, not an
+and approximately, so it is a shield against sustained abuse, not an
 exact quota, and a short burst may exceed 60 before refusals begin.
 Document content is never logged, stored, or used for training;
-telemetry records shape only — tool name, size *bucket*, duration,
+telemetry records shape only: tool name, size *bucket*, duration,
 status, error code.
 
 ## Bundled data
@@ -237,7 +237,7 @@ cd ts && npm run gen-data
 ```
 
 The build compiles `data/` into `ts/src/data-bundle.ts` (generated,
-gitignored) and the code reads that static import — never the
+gitignored) and the code reads that static import, never the
 filesystem, because the hosted Worker does not have one. The test suite
 fails on a stale regeneration or a stale embed, and checks the embedded
 set against the directory rather than a hand-kept list. Derive, never
@@ -278,7 +278,7 @@ ln -s ../../../../support/ts node_modules/@tabnas/support
 
 ## CI
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — a caller of the
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml), a caller of the
 org's `tabnas/.github` `polyglot-ci.yml` (ts-only, with `parser` and
 `support` cloned as siblings), promoted from `ci/ci.yml` in `0abc17e`.
 Automation cannot push workflow files (admin ADR-8), so any future change
@@ -286,7 +286,7 @@ is staged in `ci/` for a maintainer to promote via the admin rollout
 scripts.
 
 CI runs `test/workerd.test.js`, which boots the real `wrangler.json` in
-real workerd — so the hosted endpoint's deployability is gated on every
+real workerd, so the hosted endpoint's deployability is gated on every
 push, not discovered at deploy time.
 
 ## License
