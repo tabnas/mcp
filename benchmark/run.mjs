@@ -6,13 +6,16 @@
  *
  * Two modes, and the distinction matters:
  *
- *   --self-test   Prove the BENCHMARK works. For every task: materialise it,
- *                 apply the reference solution, and require the check to
- *                 pass; then materialise it again, apply the deliberately
- *                 wrong answer, and require the check to FAIL. This runs in
- *                 CI. It measures no agent — it measures the benchmark, so
- *                 that the benchmark cannot quietly rot into ten tasks that
- *                 are impossible, or ten checks that pass anything.
+ *   --self-test   Prove the BENCHMARK works. For every task: materialise it
+ *                 and require its declared PREMISE to hold, so the starting
+ *                 state still does what the prompt says it does; apply the
+ *                 reference solution, and require the check to pass; then
+ *                 materialise it again, apply the deliberately wrong answer,
+ *                 and require the check to FAIL. This runs in CI. It
+ *                 measures no agent — it measures the benchmark, so that the
+ *                 benchmark cannot rot into ten tasks that are impossible,
+ *                 ten premises that are untrue, or ten checks that pass
+ *                 anything.
  *
  *   --scaffold    Materialise the tasks into a directory for an actual agent
  *                 run, and emit the scoring sheet. Running the agent, and
@@ -23,27 +26,12 @@
  * claim that an agent has been measured.
  */
 
-import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
-import { join, dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 
 import { TASKS, METRICS } from './tasks.mjs'
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const REPO = join(HERE, '..')
-const CLI = join(REPO, 'ts', 'dist', 'cli.js')
-
-function readSafe(p) {
-  try {
-    return readFileSync(p, 'utf8')
-  } catch {
-    return null
-  }
-}
-
-const PKG = JSON.parse(readSafe(join(REPO, 'ts', 'package.json')) ?? '{"version":"0.0.0"}')
+import { CLI, PKG, makeEnv, materialise, checkPremise } from './harness.mjs'
 
 // Parsed positionally rather than with indexOf, so that the VALUE of --out is
 // not also read as the task filter (it is a bare word, and that is exactly
@@ -79,29 +67,6 @@ if (!existsSync(CLI)) {
   process.exit(2)
 }
 
-// --- the environment handed to a task's setup / solve / check ---------------
-
-function makeEnv(dir) {
-  const cli = (args, cwd = dir) =>
-    spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', input: '' })
-  const node = (args, cwd = dir) =>
-    spawnSync(process.execPath, args, { cwd, encoding: 'utf8', input: '' })
-  return {
-    cli,
-    node,
-    cliPath: CLI,
-    pkgVersion: PKG.version,
-    mkdir: (p) => mkdirSync(p, { recursive: true }),
-  }
-}
-
-function materialise(task, dir) {
-  mkdirSync(dir, { recursive: true })
-  const env = makeEnv(dir)
-  task.setup?.(dir, env)
-  return env
-}
-
 // --- self-test --------------------------------------------------------------
 
 function selfTest(tasks) {
@@ -109,9 +74,20 @@ function selfTest(tasks) {
   let failures = 0
 
   for (const task of tasks) {
-    // 1. the reference solution must pass
+    // 1. the starting state must exhibit what the prompt describes
+    const fresh = join(root, `${task.id}-premise`)
+    let env = materialise(task, fresh)
+    const premise = checkPremise(task, fresh, env)
+    if (premise.pass) {
+      console.log(`  ${task.id}  premise holds  (${task.premise.says})`)
+    } else {
+      console.error(`  ${task.id}  PREMISE DOES NOT HOLD — ${premise.why}`)
+      failures++
+    }
+
+    // 2. the reference solution must pass
     const solved = join(root, `${task.id}-solved`)
-    let env = materialise(task, solved)
+    env = materialise(task, solved)
     let verdict
     try {
       task.solve(solved, env)
@@ -126,7 +102,7 @@ function selfTest(tasks) {
       failures++
     }
 
-    // 2. the wrong answer must be rejected
+    // 3. the wrong answer must be rejected
     const spoiled = join(root, `${task.id}-spoiled`)
     env = materialise(task, spoiled)
     let rejected
@@ -251,5 +227,7 @@ if (MODE === 'scaffold') {
     console.error(`\n${failures} problem(s): the benchmark itself is broken.`)
     process.exit(1)
   }
-  console.log('\nEvery task is solvable and every check rejects a wrong answer.')
+  console.log(
+    '\nEvery premise holds, every task is solvable, and every check rejects a wrong answer.',
+  )
 }

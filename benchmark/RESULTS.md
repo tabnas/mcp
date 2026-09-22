@@ -30,19 +30,23 @@ plausible rather than absurd, which is exactly what makes it likely. A
 grammar passed to `use` could reasonably throw a message naming
 `grammar()`.
 
-**Task 04's premise is false, and the reason matters.** It says
-`grammar.json` "is rejected by `tabnas validate`". It is not:
-`validate` returns `{ok:true,v:2}`. The planted defect is `"p": "mapp"`, a
-reference to a rule that does not exist, and **`validate_grammar` does not
-check rule references** — it validates structure against the schema and
-loads the grammar, neither of which resolves `p`/`r` targets. The engine
-raises `unknown_rule` at parse time instead.
+**Task 04's premise was false, and the reason mattered.** It says
+`grammar.json` "is rejected by `tabnas validate`". Against the 0.1.7 CLI it
+was not: `validate` returned `{ok:true,v:2}`. The planted defect is
+`"p": "mapp"`, a reference to a rule that does not exist, and
+**`validate_grammar` did not check rule references** at that version. It
+validated structure against the schema and loaded the grammar, neither of
+which resolves `p`/`r` targets, so the engine raised `unknown_rule` at parse
+time instead.
 
-That is a gap in the tool, not just wrong task text. Reachability of named
-rules is statically decidable and cheap: every `p` and `r` either names a
-key in `rule` or it does not. Catching it in `validate_grammar` would turn
-a parse-time surprise into an authoring-time error, which is the whole
-point of having a validate step.
+That was a gap in the tool as well as wrong task text. Reachability of named
+rules is statically decidable and cheap: every `p` and `r` either names a key
+in `rule` or it does not. `validate_grammar` now scans them and reports the
+offending path, which turns the parse-time surprise into the authoring-time
+error a validate step exists to give. The premise the prompt states is
+therefore true of the current CLI, and `--self-test` asserts it against the
+unsolved setup of every task, so a prompt and a starting state cannot drift
+apart unnoticed again (tabnas/mcp#7).
 
 **Not attributable to tabnas, but real:** the documented invocation
 `npx --yes @tabnas/mcp@<version>` failed twice in this harness when held in
