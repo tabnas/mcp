@@ -8,10 +8,15 @@
  * important half: "did the agent seem to manage?" is not a measurement, and a
  * grader nobody has tried to fool is not evidence.
  *
- * Every task therefore carries three things beside its prompt:
+ * Every task therefore carries four things beside its prompt:
  *
  *   setup      files materialised into a fresh working directory before the
  *              agent starts. This is the task's starting state.
+ *   premise    what that starting state must DO: the claim the prompt makes
+ *              about the files the agent is handed. `run.mjs --self-test`
+ *              checks it before anything is solved, so a setup that drifts
+ *              away from its prompt fails loudly instead of scoring an agent
+ *              down for the benchmark's own mistake (tabnas/mcp#7).
  *   solve      a REFERENCE solution — what a correct answer does. It exists
  *              so `run.mjs --self-test` can prove the task is solvable and
  *              the check passes on a real solution, rather than the task
@@ -109,6 +114,64 @@ function readJson(dir, name) {
 const pass = () => ({ pass: true })
 const fail = (why) => ({ pass: false, why })
 
+// --- premises ---------------------------------------------------------------
+
+// A premise pairs the claim with the assertion that proves it, so the
+// self-test can print what it checked. `says` is written to read as a
+// statement about the starting state.
+//
+// 04-fix-grammar is why these exist: it told an agent `tabnas validate`
+// rejected its grammar while the scaffolded grammar validated cleanly.
+// The task stayed solvable and its check went on discriminating, because
+// neither of those two properties looks at the starting state.
+const premise = (says, holds) => ({ says, holds })
+
+// First failure wins. Each clause is a verdict, already computed.
+function all(...verdicts) {
+  for (const v of verdicts) {
+    if (!v.pass) return v
+  }
+  return pass()
+}
+
+// A file the agent is asked to produce must not be in the starting
+// state, or the task can be completed by doing nothing.
+function absent(dir, ...names) {
+  for (const name of names) {
+    if (null !== read(dir, name)) return fail(`${name} is already in the starting state`)
+  }
+  return pass()
+}
+
+function present(dir, ...names) {
+  for (const name of names) {
+    if (null === read(dir, name)) return fail(`${name} is missing from the starting state`)
+  }
+  return pass()
+}
+
+// `tabnas <args>` must fail, and, when `naming` is given, must say why in
+// the terms the prompt uses. A failure for some other reason is a
+// different starting state from the one the prompt describes.
+function cliFails(env, dir, args, naming) {
+  const res = env.cli(args, dir)
+  if (0 === res.status) {
+    return fail(`\`tabnas ${args.join(' ')}\` succeeded; the prompt says it does not`)
+  }
+  const out = res.stdout + res.stderr
+  if (null != naming && !out.includes(naming)) {
+    return fail(`\`tabnas ${args.join(' ')}\` failed without naming ${naming}: ${out.trim()}`)
+  }
+  return pass()
+}
+
+function cliWorks(env, dir, args) {
+  const res = env.cli(args, dir)
+  return 0 === res.status
+    ? pass()
+    : fail(`\`tabnas ${args.join(' ')}\` failed: ${(res.stdout + res.stderr).trim()}`)
+}
+
 // --- the ten tasks ----------------------------------------------------------
 
 export const TASKS = [
@@ -122,6 +185,10 @@ export const TASKS = [
       'reports to version.txt in the working directory.',
     measures: ['completion', 'invalid commands attempted'],
     setup() {},
+    premise: premise(
+      'the working directory is empty, so nothing reports a version yet',
+      (dir) => absent(dir, 'version.txt'),
+    ),
     solve(dir, { cli }) {
       writeFileSync(join(dir, 'version.txt'), cli(['--version']).stdout)
     },
@@ -149,6 +216,14 @@ export const TASKS = [
       writeFileSync(join(dir, 'grammar.json'), json(JSON_GRAMMAR))
       writeFileSync(join(dir, 'input.json'), '{"a":1,"b":[2,3]}')
     },
+    premise: premise(
+      'input.json parses with grammar.json, and out.json does not exist yet',
+      (dir, env) =>
+        all(
+          absent(dir, 'out.json'),
+          cliWorks(env, dir, ['parse', 'input.json', '--grammar', 'grammar.json', '--json']),
+        ),
+    ),
     solve(dir, { cli }) {
       const res = cli(['parse', 'input.json', '--grammar', 'grammar.json', '--json'], dir)
       writeFileSync(join(dir, 'out.json'), json(JSON.parse(res.stdout).tree))
@@ -178,6 +253,10 @@ export const TASKS = [
       mkdir(join(dir, 'samples'))
       writeFileSync(join(dir, 'samples', 'list.txt'), '1,2,3')
     },
+    premise: premise(
+      'samples/list.txt is there to parse, and no grammar.json is',
+      (dir) => all(present(dir, join('samples', 'list.txt')), absent(dir, 'grammar.json')),
+    ),
     solve(dir) {
       // The list/elem/val machinery from the JSON grammar, started at `list`
       // and with the brackets removed: a bare comma-separated sequence. The
@@ -251,6 +330,19 @@ export const TASKS = [
       writeFileSync(join(dir, 'grammar.json'), json(broken))
       writeFileSync(join(dir, 'input.json'), '{"a":1}')
     },
+    // The premise the prompt states. It was false once: `p` naming a
+    // missing rule was structurally valid, `validate` said ok, and the
+    // failure arrived at parse time instead (tabnas/mcp#7). The rule
+    // reference scan now catches it, and this is what holds that CLI
+    // behaviour and this prompt together.
+    premise: premise(
+      '`tabnas validate` rejects grammar.json, naming the unknown rule mapp',
+      (dir, env) =>
+        all(
+          cliFails(env, dir, ['validate', '--grammar', 'grammar.json', '--json'], 'mapp'),
+          cliFails(env, dir, ['parse', 'input.json', '--grammar', 'grammar.json', '--json'], 'mapp'),
+        ),
+    ),
     solve(dir) {
       const g = JSON.parse(readFileSync(join(dir, 'grammar.json'), 'utf8'))
       g.rule.val.open[0].p = 'map'
@@ -279,6 +371,27 @@ export const TASKS = [
       writeFileSync(join(dir, 'grammar.json'), json(JSON_GRAMMAR))
       writeFileSync(join(dir, 'bad.json'), '{"a":}')
     },
+    premise: premise(
+      'bad.json does not parse, and `tabnas diagnose` reports a code, a row and a column',
+      (dir, env) => {
+        const start = all(
+          absent(dir, 'diagnosis.json'),
+          cliFails(env, dir, ['parse', 'bad.json', '--grammar', 'grammar.json', '--json']),
+        )
+        if (!start.pass) return start
+        const res = env.cli(['diagnose', 'bad.json', '--grammar', 'grammar.json', '--json'], dir)
+        let d
+        try {
+          d = JSON.parse(res.stdout).diagnostic
+        } catch {
+          return fail('`tabnas diagnose` did not return JSON')
+        }
+        if (null == d || null == d.code || null == d.row || null == d.col) {
+          return fail(`diagnostic is ${JSON.stringify(d)}, without a code, row and col to report`)
+        }
+        return pass()
+      },
+    ),
     solve(dir, { cli }) {
       const res = cli(['diagnose', 'bad.json', '--grammar', 'grammar.json', '--json'], dir)
       const e = JSON.parse(res.stdout).diagnostic
@@ -327,6 +440,14 @@ export const TASKS = [
       writeFileSync(join(dir, 'numbers.txt'), '42')
       writeFileSync(join(dir, 'object.json'), '{"a":"x"}')
     },
+    premise: premise(
+      'numbers.txt is rejected by grammar.json, and object.json is accepted',
+      (dir, env) =>
+        all(
+          cliFails(env, dir, ['parse', 'numbers.txt', '--grammar', 'grammar.json', '--json']),
+          cliWorks(env, dir, ['parse', 'object.json', '--grammar', 'grammar.json', '--json']),
+        ),
+    ),
     solve(dir) {
       const g = JSON.parse(readFileSync(join(dir, 'grammar.json'), 'utf8'))
       g.options.tokenSet.VAL = ['#ST', '#NR', '#VL']
@@ -361,6 +482,11 @@ export const TASKS = [
     setup(dir) {
       writeFileSync(join(dir, 'grammar.json'), json(JSON_GRAMMAR))
     },
+    premise: premise(
+      'grammar.json validates, so fixtures can be written against it, and cases.tsv does not exist yet',
+      (dir, env) =>
+        all(absent(dir, 'cases.tsv'), cliWorks(env, dir, ['validate', '--grammar', 'grammar.json'])),
+    ),
     solve(dir) {
       writeFileSync(
         join(dir, 'cases.tsv'),
@@ -425,6 +551,25 @@ export const TASKS = [
         }),
       )
     },
+    premise: premise(
+      'tabnas.plugin.json disagrees with ts/package.json and go/go.mod, and carries a version field',
+      (dir) => {
+        const got = readJson(dir, 'tabnas.plugin.json')
+        if (!got.ok) return fail(got.why)
+        const pkg = readJson(dir, join('ts', 'package.json'))
+        if (!pkg.ok) return fail(pkg.why)
+        const gomod = read(dir, join('go', 'go.mod')) ?? ''
+        const d = got.value
+        if (d.name === pkg.value.name) {
+          return fail('the descriptor name already matches ts/package.json')
+        }
+        if (gomod.includes(`module ${d.go}`)) {
+          return fail('the descriptor go module already matches go/go.mod')
+        }
+        if (!('version' in d)) return fail('the descriptor carries no version field to remove')
+        return pass()
+      },
+    ),
     solve(dir) {
       const d = JSON.parse(readFileSync(join(dir, 'tabnas.plugin.json'), 'utf8'))
       d.name = '@tabnas/widget'
@@ -473,6 +618,26 @@ export const TASKS = [
       writeFileSync(join(dir, 'samples', 'two.txt'), '7')
       writeFileSync(join(dir, 'samples', 'three.txt'), '["x"]')
     },
+    premise: premise(
+      'exactly one sample is accepted by one grammar and rejected by the other, and it is two.txt',
+      (dir, env) => {
+        const differing = ['one.txt', 'two.txt', 'three.txt'].filter((f) => {
+          const a = 0 === env.cli(['parse', join('samples', f), '--grammar', 'a.json'], dir).status
+          const b = 0 === env.cli(['parse', join('samples', f), '--grammar', 'b.json'], dir).status
+          return a !== b
+        })
+        if (1 !== differing.length) {
+          return fail(
+            `${differing.length} sample(s) differ between a.json and b.json` +
+              (differing.length ? `: ${differing.join(', ')}` : ''),
+          )
+        }
+        if ('two.txt' !== differing[0]) {
+          return fail(`the differing sample is ${differing[0]}, but the check expects two.txt`)
+        }
+        return absent(dir, 'difference.txt')
+      },
+    ),
     solve(dir, { cli }) {
       for (const f of ['one.txt', 'two.txt', 'three.txt']) {
         const ra = cli(['parse', `samples/${f}`, '--grammar', 'a.json'], dir).status === 0
@@ -508,6 +673,25 @@ export const TASKS = [
       writeFileSync(join(dir, 'grammar.json'), json(JSON_GRAMMAR))
       writeFileSync(join(dir, 'input.json'), '{"a":1,"b":2,"c":3}')
     },
+    premise: premise(
+      'input.json parses to a three-key document, and app.mjs does not exist yet',
+      (dir, env) => {
+        const start = absent(dir, 'app.mjs')
+        if (!start.pass) return start
+        const res = env.cli(['parse', 'input.json', '--grammar', 'grammar.json', '--json'], dir)
+        if (0 !== res.status) return fail('input.json does not parse with grammar.json')
+        let tree
+        try {
+          tree = JSON.parse(res.stdout).tree
+        } catch {
+          return fail('parse output was not JSON')
+        }
+        const keys = null != tree && 'object' === typeof tree ? Object.keys(tree).length : -1
+        return 3 === keys
+          ? pass()
+          : fail(`input.json parses to ${JSON.stringify(tree)}, not the three-key document asked for`)
+      },
+    ),
     solve(dir, { cliPath }) {
       // Shelling out to the CLI is a legitimate integration and the one an
       // agent can verify end to end; using the library API directly is
