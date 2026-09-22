@@ -39,7 +39,7 @@ validated structure against the schema and loaded the grammar, neither of
 which resolves `p`/`r` targets, so the engine raised `unknown_rule` at parse
 time instead.
 
-That was a gap in the tool, not just wrong task text. Reachability of named
+That was a gap in the tool as well as wrong task text. Reachability of named
 rules is statically decidable and cheap: every `p` and `r` either names a key
 in `rule` or it does not. `validate_grammar` now scans them and reports the
 offending path, which turns the parse-time surprise into the authoring-time
