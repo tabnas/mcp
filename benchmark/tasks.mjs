@@ -439,13 +439,20 @@ export const TASKS = [
       writeFileSync(join(dir, 'grammar.json'), json(g))
       writeFileSync(join(dir, 'numbers.txt'), '42')
       writeFileSync(join(dir, 'object.json'), '{"a":"x"}')
+      // The prompt claims arrays parse, so the starting state has to carry
+      // one and the premise has to parse it. Without this sample, nothing
+      // in the task ever parses an array: the shared grammar could lose
+      // its list rule and premise, reference solution and check would all
+      // stay green while the prompt told the agent something untrue.
+      writeFileSync(join(dir, 'array.json'), '["x","y"]')
     },
     premise: premise(
-      'numbers.txt is rejected by grammar.json, and object.json is accepted',
+      'numbers.txt is rejected by grammar.json, and object.json and array.json are accepted',
       (dir, env) =>
         all(
           cliFails(env, dir, ['parse', 'numbers.txt', '--grammar', 'grammar.json', '--json']),
           cliWorks(env, dir, ['parse', 'object.json', '--grammar', 'grammar.json', '--json']),
+          cliWorks(env, dir, ['parse', 'array.json', '--grammar', 'grammar.json', '--json']),
         ),
     ),
     solve(dir) {
@@ -558,12 +565,25 @@ export const TASKS = [
         if (!got.ok) return fail(got.why)
         const pkg = readJson(dir, join('ts', 'package.json'))
         if (!pkg.ok) return fail(pkg.why)
-        const gomod = read(dir, join('go', 'go.mod')) ?? ''
+        // Not `?? ''`: an absent or unreadable go.mod would then simply
+        // fail to name the descriptor's module, the mismatch clause below
+        // would hold vacuously, and the premise would certify a starting
+        // state missing the very file the prompt tells the agent to
+        // correct against. Nothing else in the task reads go.mod, so this
+        // is the only place that rot can be caught.
+        const gomod = read(dir, join('go', 'go.mod'))
+        if (null === gomod) {
+          return fail('go/go.mod is missing or unreadable in the starting state')
+        }
+        const declared = /^module\s+(\S+)/m.exec(gomod)
+        if (null === declared) {
+          return fail('go/go.mod declares no module path to correct against')
+        }
         const d = got.value
         if (d.name === pkg.value.name) {
           return fail('the descriptor name already matches ts/package.json')
         }
-        if (gomod.includes(`module ${d.go}`)) {
+        if (declared[1] === d.go) {
           return fail('the descriptor go module already matches go/go.mod')
         }
         if (!('version' in d)) return fail('the descriptor carries no version field to remove')
