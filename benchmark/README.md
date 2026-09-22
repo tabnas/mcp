@@ -43,20 +43,31 @@ node benchmark/run.mjs --score --out ./run       # decide completion
 ## Why there is a self-test
 
 A benchmark is a measuring instrument, and an instrument nobody has checked
-is decoration. `--self-test` proves two things about **every** task, and runs
-in CI:
+is decoration. `--self-test` proves three things about **every** task, and
+runs in CI:
 
-1. **It is solvable.** The task carries a reference solution; the check must
-   pass on it. A task that has quietly rotted into something impossible —
-   because a flag was renamed, or the CLI's output shape changed — fails here
-   rather than being reported as "no agent could do it".
-2. **Its check discriminates.** The task also carries a deliberately wrong
+1. **Its premise is true.** The task declares what its unsolved starting
+   state must do, and the self-test checks that against a freshly
+   materialised directory before anything is solved. A prompt saying
+   `tabnas validate` rejects the supplied grammar is a claim about the
+   starting state, and a task whose setup has drifted away from its prompt
+   fails here rather than scoring an agent down for the benchmark's own
+   mistake.
+2. **It is solvable.** The task carries a reference solution; the check must
+   pass on it. A task that has rotted into something impossible, because a
+   flag was renamed or the CLI's output shape changed, fails here rather
+   than being reported as "no agent could do it".
+3. **Its check discriminates.** The task also carries a deliberately wrong
    answer, and the check must *reject* it. A grader that accepts anything
    measures nothing, and every check here has been made to fail on purpose.
 
-Both halves have earned their keep already: the first run of the self-test
+All three have earned their keep already: the first run of the self-test
 found four tasks whose reference solutions read the wrong key out of the
-CLI's `--json` output, and one whose grammar parsed to an empty array.
+CLI's `--json` output, and one whose grammar parsed to an empty array. The
+premise check arrived after 04-fix-grammar spent a benchmark run telling an
+agent about a validation failure that did not happen (tabnas/mcp#7); the
+other two properties passed throughout, because neither of them looks at the
+starting state.
 
 The wrong answers are chosen to be *plausible*, not absurd — task 07's is
 three passing rows and a bare `ERROR` (rejection asserted, code not), and
@@ -89,10 +100,13 @@ their job, or whether an agent is filling gaps by invention.
 
 ## Adding a task
 
-Add an entry to `tasks.mjs` with `setup`, `prompt`, `solve`, `spoil` and
-`check`. The self-test will tell you immediately if the task cannot be solved
-or if the check accepts the wrong answer — which is the point of writing both
-of those before trusting the task.
+Add an entry to `tasks.mjs` with `setup`, `prompt`, `premise`, `solve`,
+`spoil` and `check`. The self-test will tell you immediately if the premise
+does not hold, if the task cannot be solved, or if the check accepts the
+wrong answer, which is the point of writing all three before trusting the
+task. A task that declares no premise fails the self-test: state what the
+starting state does, even when the answer is that the working directory is
+empty.
 
 Keep fixtures small. A task should fail because the agent got it wrong, not
 because the starting state was too large to reason about.

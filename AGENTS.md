@@ -33,7 +33,7 @@ structural grammar validation is runtime behaviour of
 | `ts/tools/build-validator.js` | Build step: precompiles the grammar schema into `ts/src/grammar-validator.js`. |
 | `data/` | **Bundled, generated, committed** copies of the fleet contract files: `grammar.schema.json`, `diagnostic.schema.json`, `error-codes.json`, `DIVERGENCE.md`, `plugins.json`. Never edit by hand. |
 | `ts/test/` | `node --test` suites, CJS. `golden.test.js` is the front-end parity gate. |
-| `benchmark/` | The AX benchmark (plan E1): ten agent tasks, their starting state, and a machine check per task. `--self-test` runs as part of `npm test` and measures **the benchmark**, not any agent. See [`benchmark/README.md`](benchmark/README.md). |
+| `benchmark/` | The AX benchmark (plan E1): ten agent tasks, their starting state, a declared premise per task, and a machine check per task. `--self-test` runs as part of `npm test` and measures **the benchmark**, not any agent. See [`benchmark/README.md`](benchmark/README.md). |
 | `ts/src/worker.ts` | The **hosted** endpoint (plan Phase 4): streamable-HTTP MCP at `POST /mcp`, plus `/health` and `/.well-known/mcp`. Transport ONLY — every parsing decision is the same core, so hosted and local cannot diverge. Its exports must all be functions (see below). |
 | `ts/src/budget.ts` | The hosted endpoint's limits and shape-only telemetry. Separate from `worker.ts` because workerd rejects a non-function named export on a Worker entrypoint. |
 | `wrangler.json` | The hosted Worker's deploy config (`mcp.tabnas.dev`). Separate from the website's Worker on purpose. |
@@ -323,11 +323,14 @@ What "correct" means here, in order of authority:
    or options — and the pollution test proves `({}).polluted` stays
    `undefined` after a rejected poison grammar.
 4. **CLI exit codes hold**: 0 success, 1 operation-said-no, 2 usage.
-5. **The benchmark self-test passes**: every one of its ten tasks is still
-   solvable, and every check still rejects a deliberately wrong answer. It
-   runs against the built CLI, so it fails when a flag is renamed or an
-   output shape changes — which is exactly what it is for. It says nothing
-   about any agent, and a green run must never be reported as one.
+5. **The benchmark self-test passes**: every one of its ten tasks still
+   holds its declared premise, is still solvable, and every check still
+   rejects a deliberately wrong answer. It runs against the built CLI, so it
+   fails when a flag is renamed or an output shape changes — which is exactly
+   what it is for. A task's premise is what its prompt claims about the
+   starting state, so a CLI change that makes a task's setup stop failing the
+   way its prompt says it does is caught here too. It says nothing about any
+   agent, and a green run must never be reported as one.
 
 ## The hosted endpoint (Phase 4)
 
