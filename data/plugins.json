@@ -104,6 +104,7 @@
       "$schema": "https://tabnas.dev/schema/plugin.schema.json",
       "name": "@tabnas/css",
       "go": "github.com/tabnas/css/go",
+      "rust": "tabnas-css",
       "description": "CSS parsing for the tabnas engine.",
       "base": "@tabnas/jsonic",
       "engine": "@tabnas/parser",
