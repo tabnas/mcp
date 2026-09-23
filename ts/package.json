@@ -1,6 +1,6 @@
 {
   "name": "@tabnas/mcp",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "mcpName": "dev.tabnas/mcp",
   "main": "dist/mcp.js",
   "type": "commonjs",
