@@ -37,6 +37,17 @@
       "extensions": [
         ".bnf"
       ],
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasbnf",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/bnf",
@@ -181,6 +192,17 @@
       "description": "Parse tracing and a structured grammar-model describe() for the tabnas engine.",
       "engine": "@tabnas/parser",
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasdebug",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/debug",
@@ -193,6 +215,17 @@
       "description": "Directive syntax for the tabnas engine.",
       "engine": "@tabnas/parser",
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasdirective",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/directive",
@@ -232,6 +265,17 @@
       "base": "@tabnas/jsonic",
       "engine": "@tabnas/parser",
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasexpr",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/expr",
@@ -275,6 +319,17 @@
       "extensions": [
         ".gbnf"
       ],
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasgbnf",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/gbnf",
@@ -287,6 +342,17 @@
       "description": "Whitespace-absorbing text capture for the tabnas engine.",
       "engine": "@tabnas/parser",
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnashoover",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/hoover",
@@ -558,6 +624,17 @@
       "description": "Multi-source document assembly for the tabnas engine: resolves and merges included sources.",
       "engine": "@tabnas/parser",
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnasmultisource",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [
         "multisource_not_found",
         "multisource_cycle"
@@ -573,6 +650,17 @@
       "description": "Value-path resolution for the tabnas engine.",
       "engine": "@tabnas/parser",
       "specDir": "test/spec",
+      "clib": {
+        "dir": "go/clib",
+        "library": "libtabnaspath",
+        "abi": "v1",
+        "errorCodes": [
+          "usage",
+          "grammar",
+          "handle",
+          "internal"
+        ]
+      },
       "errorCodes": [],
       "docs": "https://tabnas.dev/docs/packages",
       "repository": "https://github.com/tabnas/path",
