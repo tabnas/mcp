@@ -142,10 +142,13 @@ The steps, in order:
    with itself and pass. If you no longer have the SHA, recover it from the
    original run — the `head_sha` of that `release.yml` run is the commit it
    published.
-6. Confirm. **This release has three jobs, not one** — `publish-npm`,
-   `publish-registry` and `deploy-worker` — so npm and the tag can both look
-   right while a channel is stale. Require the whole run to have succeeded,
-   then:
+6. Confirm. **This release has four jobs, not one** — `publish-npm`,
+   `publish-registry`, `deploy-worker` and `github-release` — so npm and the
+   tag can both look right while a channel is stale. `github-release` (admin
+   ADR-19) runs last, once the other three have succeeded, and calls
+   `.github/workflows/github-release.yml` to create a notes-only GitHub
+   Release on `ts/v$V`. Require the whole run to have succeeded, including
+   a published Release on `ts/v$V`, then:
 
    ```bash
    V=x.y.z
@@ -193,6 +196,13 @@ shape, this one sets `needed=false`, skips only the tag step, and lets
 the repair path for a run where npm and the tag landed but a downstream job
 did not, so re-dispatching is the right move rather than something to work
 around.
+
+The GitHub Release is the exception. `github-release` needs all three
+channels, and on a recovery re-dispatch `publish-registry` fails because the
+MCP registry refuses a version it already holds, so the Release job is
+skipped again. Once npm, the registry and the Worker are all live, create it
+by dispatching `.github/workflows/github-release.yml` on `main` with the tag
+`ts/v$V`; it leaves an existing Release alone.
 
 The one case that is not repairable by re-dispatch is a run that published
 to npm and died before the tag was written. No tag then exists to anchor the

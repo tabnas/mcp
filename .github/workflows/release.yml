@@ -48,10 +48,23 @@ jobs:
     permissions:
       id-token: write   # OIDC -> npm; cannot write refs
       contents: write   # GITHUB_TOKEN -> the ts/v tag
+    outputs:
+      release-tag: ts/v${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
         with:
           fetch-depth: 0   # tags, for the already-released guard
+
+      # ADR-20: only a COMPONENT or a TOOL publishes. The repository's kind
+      # is committed in .tabnas-kind (COMPONENT, TOOL, CONTENT or ADMIN), so
+      # this workflow refuses to run in a repository that does not publish.
+      - name: Refuse unless this repository publishes (COMPONENT or TOOL)
+        run: |
+          K="$(tr -d '[:space:]' < .tabnas-kind 2>/dev/null || true)"
+          case "$K" in
+            COMPONENT|TOOL) echo "kind: $K" ;;
+            *) echo "::error::.tabnas-kind is '${K:-missing}', and only a COMPONENT or a TOOL publishes (admin ADR-20)"; exit 1 ;;
+          esac
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
         with:
@@ -218,6 +231,22 @@ jobs:
         # The assertion the whole service rests on. A deploy that lands but
         # answers differently is worse than one that fails.
         run: node benchmark/parity.mjs
+
+  # ADR-19: the GitHub Release, and here it is the LAST thing a release
+  # does: it needs all three channels, so a Release exists only once npm, the
+  # MCP registry and the Worker agree on this version. A call, not an event,
+  # because a Release created with GITHUB_TOKEN starts no workflow run.
+  # A re-dispatch does NOT recover it after a partial failure: the registry
+  # refuses a version it already holds, so publish-registry goes red on the
+  # rerun and this job is skipped again. Once all three channels are live,
+  # dispatch github-release.yml with the tag instead.
+  github-release:
+    needs: [publish-npm, publish-registry, deploy-worker]
+    permissions:
+      contents: write   # GITHUB_TOKEN -> the Release
+    uses: ./.github/workflows/github-release.yml
+    with:
+      tag: ${{ needs.publish-npm.outputs.release-tag }}
 
   # STILL not automated here: the skills/mcp.json pin, which needs write
   # access to ANOTHER repository. That is a different kind of credential from
