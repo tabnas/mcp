@@ -2,8 +2,8 @@
 
 How the tabnas documentation is written. Adapted from
 [aontu](https://github.com/aontu-lang/aontu)'s `docs/STYLE-GUIDE.md`,
-with tabnas's terminology, two-runtime file layout, and executable-example
-conventions. This guide is normative for every page `ts/scripts/gated-docs.cjs`
+with tabnas's terminology, a one-runtime file layout (TypeScript only,
+with no per-runtime doc set), and executable-example conventions. This guide is normative for every page `ts/scripts/gated-docs.cjs`
 lists, which is the reader-facing set: 2 pages in this repository. It exists so that a page written next year sounds like a
 page written this year, and so that a reviewer can point at a rule instead
 of arguing taste.
