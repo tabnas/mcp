@@ -208,7 +208,7 @@ Exit code is 1 when any change is found, so it works as a release gate.
 `mcp.tabnas.dev` serves the same seven tools over streamable HTTP
 (`POST /mcp`, plus `GET /health` and `GET /.well-known/mcp`), for agents
 that cannot run `npx`. **Local stdio stays the recommended path**: it is
-free, private, reproducible and unlimited.
+free, private, reproducible, and unlimited.
 
 The hosted service is the same core, so it answers identically; it is
 also bounded, because it parses attacker-controlled text on shared
