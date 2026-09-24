@@ -92,7 +92,7 @@ structural grammar validation is runtime behaviour of
 | `ts/src/worker.ts` | The **hosted** endpoint (plan Phase 4): streamable-HTTP MCP at `POST /mcp`, plus `/health` and `/.well-known/mcp`. Transport ONLY — every parsing decision is the same core, so hosted and local cannot diverge. Its exports must all be functions (see below). |
 | `ts/src/budget.ts` | The hosted endpoint's limits and shape-only telemetry. Separate from `worker.ts` because workerd rejects a non-function named export on a Worker entrypoint. |
 | `wrangler.json` | The hosted Worker's deploy config (`mcp.tabnas.dev`). Separate from the website's Worker on purpose. |
-| `ci/` | The staging area for workflow changes, empty of workflows today; see "CI" and [`ci/README.md`](ci/README.md). |
+| `ci/` | No scripts and no workflows; workflow changes are made in `.github/workflows/` directly, in a reviewed pull request. See "CI" and [`ci/README.md`](ci/README.md). |
 
 ## Authority and alignment rules
 
@@ -495,10 +495,11 @@ behind both, with `tsc --build` still doing the type-checking.
 CI runs from `.github/workflows/ci.yml`, a ts-only caller of
 `tabnas/.github`'s `polyglot-ci.yml` with `deps: "parser support"`,
 promoted from a staged `ci/ci.yml` that no longer exists. The prose gate
-runs from `.github/workflows/docs.yml`. Automation cannot push workflow
-files (admin ADR-8), so a change to either is **staged in `ci/`** and a
-maintainer promotes it via the admin rollout scripts; stage the change,
-never edit `.github/workflows/` directly.
+runs from `.github/workflows/docs.yml`. To change either, **edit
+`.github/workflows/` in a reviewed pull request**: session credentials
+push workflow files (admin `DECISIONS.md` ADR-8, as amended 2026-09-24),
+so staging the change in `ci/` first is optional. Sessions still cannot
+push tags, so a maintainer pushes any tag a tag-triggered workflow needs.
 
 CI clones only `parser` and `support` beside this repo, so the plugin
 staleness test compares just the descriptors whose repos are present —

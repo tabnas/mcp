@@ -281,9 +281,8 @@ ln -s ../../../../support/ts node_modules/@tabnas/support
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml), a caller of the
 org's `tabnas/.github` `polyglot-ci.yml` (ts-only, with `parser` and
 `support` cloned as siblings), promoted from `ci/ci.yml` in `a14741c`.
-Automation cannot push workflow files (admin ADR-8), so any future change
-is staged in `ci/` for a maintainer to promote via the admin rollout
-scripts.
+A change to it is made in `.github/workflows/` directly, in a reviewed
+pull request (admin ADR-8, as amended 2026-09-24).
 
 CI runs `test/workerd.test.js`, which boots the real `wrangler.json` in
 real workerd, so the hosted endpoint's deployability is gated on every

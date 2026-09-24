@@ -57,8 +57,8 @@ tightening one without the other would make the pair incoherent.
 
 ## After a release: the surfaces that do not update themselves
 
-Pushing a `ts/v*` tag publishes to npm and nothing else. Seven places record
-this package's version; that tag updates one.
+Publishing to npm updates one of the seven places that record this
+package's version. The others each need their own step.
 
 ```bash
 node ts/tools/check-published.js
@@ -68,13 +68,15 @@ Reports npm, the MCP registry entry, the deployed Worker and the skills pin
 against this checkout, and names the command that fixes each. Needs the
 network, so it is not part of `npm test`.
 
-`ci/release.yml` (staged for promotion, ADR-8) closes most of it: a `ts/v*`
-tag now publishes to npm, publishes the MCP registry entry (GitHub OIDC, no
-secret), and deploys the Worker — then verifies the live endpoint reports
-that version and still answers byte-identically to local core.
+`.github/workflows/release.yml` closes most of it: a release, dispatched on
+`main` or started by a `ts/v*` tag push, publishes to npm, publishes the MCP
+registry entry (DNS auth for the `dev.tabnas` namespace), and deploys the
+Worker — then verifies the live endpoint reports that version and still
+answers byte-identically to local core.
 
-Requires two repository secrets: `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID`.
+Requires three repository secrets: `MCP_REGISTRY_DNS_KEY` for the registry,
+and `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for the Worker. Only
+the npm publish is tokenless (GitHub OIDC).
 
 Still manual: the `skills/mcp.json` pin, which needs write access to another
 repository. That is a different kind of credential from a deploy token — it
