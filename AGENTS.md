@@ -92,7 +92,7 @@ structural grammar validation is runtime behaviour of
 | `ts/src/worker.ts` | The **hosted** endpoint (plan Phase 4): streamable-HTTP MCP at `POST /mcp`, plus `/health` and `/.well-known/mcp`. Transport ONLY — every parsing decision is the same core, so hosted and local cannot diverge. Its exports must all be functions (see below). |
 | `ts/src/budget.ts` | The hosted endpoint's limits and shape-only telemetry. Separate from `worker.ts` because workerd rejects a non-function named export on a Worker entrypoint. |
 | `wrangler.json` | The hosted Worker's deploy config (`mcp.tabnas.dev`). Separate from the website's Worker on purpose. |
-| `ci/ci.yml` | The staged CI workflow (see "CI"). |
+| `ci/` | The staging area for workflow changes, empty of workflows today; see "CI" and [`ci/README.md`](ci/README.md). |
 
 ## Authority and alignment rules
 
@@ -492,12 +492,13 @@ behind both, with `tsc --build` still doing the type-checking.
 
 ## CI
 
-Automation cannot push workflow files (admin ADR-8), so the intended
-workflow is **staged at `ci/ci.yml`** — a ts-only caller of
-`tabnas/.github`'s `polyglot-ci.yml` with `deps: "parser support"`. A
-maintainer promotes it to `.github/workflows/ci.yml` via the admin
-rollout scripts. Keep `ci/ci.yml` and the promoted copy in step; edit
-the staged file, never `.github/workflows/` directly.
+CI runs from `.github/workflows/ci.yml`, a ts-only caller of
+`tabnas/.github`'s `polyglot-ci.yml` with `deps: "parser support"`,
+promoted from a staged `ci/ci.yml` that no longer exists. The prose gate
+runs from `.github/workflows/docs.yml`. Automation cannot push workflow
+files (admin ADR-8), so a change to either is **staged in `ci/`** and a
+maintainer promotes it via the admin rollout scripts; stage the change,
+never edit `.github/workflows/` directly.
 
 CI clones only `parser` and `support` beside this repo, so the plugin
 staleness test compares just the descriptors whose repos are present —

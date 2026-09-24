@@ -280,7 +280,7 @@ ln -s ../../../../support/ts node_modules/@tabnas/support
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml), a caller of the
 org's `tabnas/.github` `polyglot-ci.yml` (ts-only, with `parser` and
-`support` cloned as siblings), promoted from `ci/ci.yml` in `0abc17e`.
+`support` cloned as siblings), promoted from `ci/ci.yml` in `a14741c`.
 Automation cannot push workflow files (admin ADR-8), so any future change
 is staged in `ci/` for a maintainer to promote via the admin rollout
 scripts.
