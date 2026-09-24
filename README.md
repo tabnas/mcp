@@ -208,7 +208,7 @@ Exit code is 1 when any change is found, so it works as a release gate.
 `mcp.tabnas.dev` serves the same seven tools over streamable HTTP
 (`POST /mcp`, plus `GET /health` and `GET /.well-known/mcp`), for agents
 that cannot run `npx`. **Local stdio stays the recommended path**: it is
-free, private, reproducible and unlimited.
+free, private, reproducible, and unlimited.
 
 The hosted service is the same core, so it answers identically; it is
 also bounded, because it parses attacker-controlled text on shared
@@ -280,7 +280,7 @@ ln -s ../../../../support/ts node_modules/@tabnas/support
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml), a caller of the
 org's `tabnas/.github` `polyglot-ci.yml` (ts-only, with `parser` and
-`support` cloned as siblings), promoted from `ci/ci.yml` in `0abc17e`.
+`support` cloned as siblings), promoted from `ci/ci.yml` in `a14741c`.
 Automation cannot push workflow files (admin ADR-8), so any future change
 is staged in `ci/` for a maintainer to promote via the admin rollout
 scripts.
