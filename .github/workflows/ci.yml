@@ -1,6 +1,6 @@
-# Staged CI caller — promoted by a maintainer to .github/workflows/ci.yml
-# via tabnas/admin rollout/apply-ci-folders.sh (session credentials cannot
-# write .github/workflows/*; admin DECISIONS.md ADR-8).
+# CI caller. Live: change it here, in a reviewed pull request (session
+# credentials push .github/workflows/*; admin DECISIONS.md ADR-8, as
+# amended 2026-09-24).
 #
 # ts-only: this repo is tooling over the engine, not a parity package —
 # there is no go/ tree (AGENTS.md "What this project is").
