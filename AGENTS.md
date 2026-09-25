@@ -171,8 +171,9 @@ The steps, in order:
    immutably. If you take it, say so.
 4. **Wait for `main` CI to go green on the bump commit.** The release
    workflow **has no test step** — it reads `main`, builds against
-   already-published dependencies, publishes and tags. `ci.yml` on the bump
-   commit is the only gate there is. An npm version is immutable.
+   already-published dependencies, publishes and tags. `ci.yml` and
+   `deps-gate.yml` on the bump commit are the only gates there are. An npm
+   version is immutable.
 5. **Record the release commit, then dispatch.** Step 6 compares the tag
    against the commit you released, so capture it *before* the dispatch,
    and read it from the remote rather than a local ref that may be stale:
