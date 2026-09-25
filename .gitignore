@@ -16,3 +16,5 @@ ts/src/grammar-validator.js
 
 # Written by the counts script while measuring, removed after.
 .vale-counts.ini
+
+.DS_Store
