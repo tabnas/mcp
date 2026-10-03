@@ -44,6 +44,8 @@
   },
   "files": [
     "LICENSE",
+    "README.md",
+    "src",
     "dist"
   ],
   "exports": {
