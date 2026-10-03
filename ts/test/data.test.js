@@ -38,6 +38,7 @@ const { buildData, hasParser, REPO_ROOT, DATA_DIR } =
   require('../tools/gen-data.js')
 
 const data = require('../dist/data.js')
+const { VERSION } = require('../dist/mcp.js')
 
 const NAMES = [
   'error-codes.json',
@@ -139,6 +140,8 @@ describe('data', () => {
     // Embedded at build time; it must track package.json, not lag it.
     assert.strictEqual(data.packageInfo().version,
       require('../package.json').version)
+    assert.strictEqual(VERSION, require('../package.json').version,
+      'public VERSION differs from package.json')
   })
 
   it('server.json names the version that is actually published', () => {
