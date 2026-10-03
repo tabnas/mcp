@@ -35,12 +35,17 @@ import { packageInfo, rawData } from './data'
 // it was split out for the Worker's benefit.
 export { TOOLS, RESOURCES, callTool } from './tools'
 
+// VERSION is this package's public, build-time version. It MUST equal
+// package.json "version": admin/publish.sh rewrites both before publishing,
+// and data.test.js fails the build if they drift.
+export const VERSION = '0.1.16'
+
 
 // Build the MCP server (name "tabnas", version from package.json) with
 // the six tools and five resources wired to core and data.
 export function buildServer(): Server {
   const server = new Server(
-    { name: 'tabnas', version: packageInfo().version },
+    { name: 'tabnas', version: VERSION },
     { capabilities: { tools: {}, resources: {} } },
   )
 

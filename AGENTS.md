@@ -138,9 +138,11 @@ orchestrator's path (`admin/publish.sh`), not yours.
 
 The steps, in order:
 
-1. Bump all **three** version sites together — `ts/package.json`, both
-   `"version"` fields in `server.json` and `ts/package-lock.json`
-   (regenerated, not hand-edited).
+1. Bump all **four** version sites together — `ts/package.json`, the public
+   `VERSION` in `ts/src/mcp.ts`, both `"version"` fields in `server.json`
+   and `ts/package-lock.json` (regenerated, not hand-edited). The fleet path,
+   `admin/publish.sh`, stamps every one before it builds; a manual bump must
+   keep the same invariant, and `data.test.js` fails when it does not.
 2. Verify against the **published** dependencies rather than your checkout.
    The release runner installs fresh from the registry; a working tree
    usually does not, so reproduce that before believing anything:
