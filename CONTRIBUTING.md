@@ -17,8 +17,12 @@ npm test
 
 ## Commit messages
 
-[Conventional Commits](https://www.conventionalcommits.org/) — release
-automation derives versions and changelogs from them, so this is required:
+[Conventional Commits](https://www.conventionalcommits.org/) are required,
+for commit messages and PR titles alike. PRs are squash-merged, so a PR's
+title is its commit message, and the GitHub Release that each release creates
+lists those titles in its generated notes. They do not set the version: a
+release is its own version-bump pull request, then a `release.yml` dispatch
+(see [`AGENTS.md`](AGENTS.md), "Releasing"). For example:
 
 ```
 feat: add lax mode for trailing commas
